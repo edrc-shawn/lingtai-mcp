@@ -22,6 +22,9 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from collections import Counter
 from itertools import combinations
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -203,7 +206,7 @@ class ReflectEngine:
                                 suggestion=f"在相关页面间添加 [[{page_a}]] 和 [[{page_b}]] 双向链接"
                             ))
             except Exception:
-                pass
+                log.debug("suppressed", exc_info=True)
         
         # 基于关键词重叠的兜底检测
         stem_list = list(pages.keys())
