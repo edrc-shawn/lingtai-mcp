@@ -36,7 +36,7 @@ Raw Materials → Refine → Knowledge Base (丹房) → 灵识 (Query/Reason/As
 
 ### The MCP Server
 
-The server lives in `.tool/lingtai-kb/`. It's a pure-Python MCP Server with **68 tools** spanning knowledge search, memory management, content publishing, material refinement, system tools, and more — all with **zero third-party dependencies**.
+The server lives in `.tool/lingtai-kb/`. It's a pure-Python MCP Server with **86 tools** spanning knowledge search, memory management, content publishing, material refinement, system tools, and more — all with **zero third-party dependencies**.
 
 See [`.tool/lingtai-kb/README.md`](.tool/lingtai-kb/README.md) for the full tool catalog, architecture details, and API reference.
 
@@ -67,8 +67,8 @@ See [`.tool/lingtai-kb/README.md`](.tool/lingtai-kb/README.md) for the full tool
 ### 1. Clone
 
 ```bash
-git clone https://github.com/edrc-shawn/lingtai.git
-cd lingtai
+git clone https://cnb.cool/edrc.shawn/lingtai-mcp.git
+cd lingtai-mcp
 ```
 
 ### 2. Create Your Knowledge Directories
@@ -76,7 +76,7 @@ cd lingtai
 灵台 expects these directories in your vault (not included in the repo — they're your personal data):
 
 ```bash
-mkdir -p 丹房 原料 体检 画像 作品
+mkdir -p 丹房 原料 体检 画像 作品 存档 简报
 ```
 
 ### 3. Connect Your AI Client
@@ -115,28 +115,28 @@ Then start a conversation and say: **"调 context_load"** — if it returns know
 ## Project Structure
 
 ```
-lingtai/
+lingtai-mcp/
 ├── README.md                    # You are here
 ├── LICENSE                      # MIT
 ├── AGENTS.md                    # AI rulebook — the operating manual for 灵识
 ├── AGENTS-appendix.md           # Rules appendix + tool reference
 ├── .gitignore                   # Excludes personal data directories
-├── .github/                     # GitHub Actions CI
+├── .github/                     # CI configuration
+├── .mcp.json.example            # MCP config template (copy to .mcp.json)
 ├── 入门/                         # Onboarding documentation
-├── 技能/                         # Skill templates (13 skills)
+├── 技能/                         # Skill library (8 skills + templates)
 └── .tool/
-    ├── lingtai-kb/              # MCP Server (116 Python files)
-    │   ├── README.md            # Server-specific docs + tool catalog
-    │   ├── mcp_server.py        # Entry point
-    │   ├── router.py            # JSON-RPC routing
-    │   ├── server.py            # Core server (12 mixin inheritance)
-    │   ├── server_mixins/       # 22 mixin modules by domain
-    │   ├── memory_bank/         # Memory persistence engine
-    │   └── skillopt/            # Self-evolution engine
-    └── scripts/                 # 46 utility scripts
+    └── lingtai-kb/              # MCP Server
+        ├── README.md            # Server docs + tool catalog
+        ├── mcp_server.py        # Entry point
+        ├── router.py            # JSON-RPC routing
+        ├── server.py            # Core server (12 mixin inheritance)
+        ├── server_mixins/       # 22 mixin modules by domain
+        ├── memory_bank/         # Memory persistence engine
+        └── skillopt/            # Self-evolution engine
 ```
 
-> **Your personal directories** (`丹房/`, `原料/`, `体检/`, `画像/`, `作品/`) are excluded from the repo via `.gitignore`. Create them locally after cloning.
+> **Your personal directories** (`丹房/`, `原料/`, `体检/`, `画像/`, `作品/`, `存档/`, `简报/`) are excluded from the repo via `.gitignore`. Create them locally after cloning.
 
 ---
 
