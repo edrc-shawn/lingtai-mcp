@@ -158,3 +158,4 @@ temp_*.txt
 
 # FTS5 全文索引数据库（运行时生成，可重建）
 .tool/lingtai-kb/.fts5.db*
+.git-backup/
