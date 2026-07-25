@@ -124,7 +124,7 @@
 1. **写丹房日志**（丹房页操作 → 自动）
 2. **重建灵识索引** → 调 `sys_refresh_index`
 3. **提 Git**（丹房页操作 → 自动；非丹房页需手动）。**commit 前缀**：`feat:`(新功能/新页) `fix:`(修 bug) `refine:`(提炼/规则改进) `docs:`(文档/内观)。
-   - **Push 节奏**：代码/架构改动 → commit 后立即 push；自动化产出（睡眠进化/每日检）→ 只 commit 不 push，待用户看过；手工内容（内观/提炼/简报）→ 用户确认后 push。
+   - **Push 节奏**：代码/文档改动 → commit 后立即 push（`.gitignore` 保护私人数据，推公开仓无风险）。私人数据目录（原料/丹房等）不进 git，不涉及 push。
    - ⚠️ 禁止 `git push --force`；禁止 `git add -A`（只暂存本轮产物，不裹无关改动）
 4. **波及检查**（Karpathy Ingest 原则，仅"提炼/新建丹房页"时）→ 调 `ingest_ripple` 预览，逐条审查后 `page_append_section` 批量补引用，目标触及 **8-15 页**，完成后再提 Git。**全跳过（applied_count=0）时不得略过**——手动补链：读新页定域 → 列同域枢纽/热页 → 追加 2-3 条 `[[新页]]` 引用。详见 `AGENTS-appendix.md#5.4`
 5. **文档对齐** → 改了代码/流程后检查 AGENTS.md/README/丹房页是否需同步
