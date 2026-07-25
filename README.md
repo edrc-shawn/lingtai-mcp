@@ -12,13 +12,13 @@
 
 灵台 is a three-layer knowledge system that combines an Obsidian vault, a custom MCP Server, and a suite of automated patrol tasks:
 
-| Layer | Role | Scale |
-|-------|------|-------|
-| **Knowledge Base** (丹房) | Structured, refined knowledge across 13 domains | 269 pages |
-| **Memory Bank** | Cross-session AI memory, user profiles, lessons | 164 memories |
-| **Raw Materials** (原料) | Unprocessed inputs awaiting refinement | 1,215 entries |
+| Layer | Role | Description |
+|-------|------|-------------|
+| **Raw Materials** (原料) | Unprocessed inputs | Notes, articles, ideas — waiting to be refined |
+| **Knowledge Base** (丹房) | Structured knowledge | Refined pages organized across multiple domains |
+| **Memory Bank** | AI memory layer | User profiles, lessons learned, observations |
 
-At its core is **灵识** — an AI identity that serves as the cognition layer, calling 68 MCP tools to search, synthesize, refine, and evolve the knowledge base. Any MCP-compatible AI client can connect to 灵台 and instantly understand you.
+At its core is **灵识** — an AI identity that serves as the cognition layer, calling MCP tools to search, synthesize, refine, and evolve the knowledge base. Any MCP-compatible AI client can connect to 灵台 and instantly understand you.
 
 ---
 
@@ -34,35 +34,25 @@ Raw Materials → Refine → Knowledge Base (丹房) → 灵识 (Query/Reason/As
                                                Archive
 ```
 
-### The MCP Server (`.tool/lingtai-kb/`)
+### The MCP Server
 
-A pure-Python MCP Server with **68 tools** organized into 14 domains:
+The server lives in `.tool/lingtai-kb/`. It's a pure-Python MCP Server with **68 tools** spanning knowledge search, memory management, content publishing, material refinement, system tools, and more — all with **zero third-party dependencies**.
 
-| Domain | Tools | Capability |
-|--------|-------|------------|
-| Knowledge Search | 12 | Semantic search, graph diffusion, heatmaps, compound interest, gap detection |
-| Memory System | 12 | User profiles, long-term memory, observation engine, memory graduation |
-| Content Output | 4 | Multi-platform publishing (WeChat, RED, TikTok, Bilibili) |
-| Material Refinement | 4 | Zero-LLM raw material pre-screening, fast refinement, status tracking |
-| Macros | 6 | Knowledge synthesis, refine-in-one-step, session wrap-up, ripple analysis |
-| System Tools | 8 | Index rebuild, health inspection, web search, token stats, cross-end sync |
-| + 8 more domains | 22 | SkillOpt self-evolution, Agent recommendation, episodic memory, concept collision |
-
-**Zero third-party dependencies** — the server runs on Python stdlib alone.
+See [`.tool/lingtai-kb/README.md`](.tool/lingtai-kb/README.md) for the full tool catalog, architecture details, and API reference.
 
 ### The Patrol System (巡更)
 
-8 automated tasks running 24/7 via WorkBuddy:
+灵台 comes with a patrol framework that lets you schedule automated knowledge tasks. For example, you can configure tasks like:
 
-| Time | Task |
-|------|------|
-| 03:00 | **Sleep Evolution** — SkillOpt engine + memory decay + change brief |
-| 08:00 | **Morning Brief** — Weather, AI news, topic suggestions → WeChat |
-| 18:00 | **Daily Check** — Lint, backlinks, evolution, reconciliation, self-heal |
-| 20:00 | **Profile Patrol** — Decay detection, behavior drift report |
-| 21:00 | **Daily Introspection** — 400-800 word first-person memory log |
-| Mon 09:00 | **Weekly Scan** — Deep archive, encoding fixes, missed materials, semantic gaps |
-| 1st of Month | **Monthly Review** — Timeliness scan, rule evolution suggestions |
+| Time | Example Task |
+|------|-------------|
+| 03:00 | SkillOpt engine — analyze usage patterns, propose rule refinements, run memory decay |
+| 08:00 | Morning brief — gather weather, AI news, topic suggestions |
+| 18:00 | Daily health check — lint, backlinks, evolution, reconciliation, self-heal |
+| Weekly | Deep archive, encoding fixes, semantic gap detection |
+| Monthly | Timeliness scan, rule evolution suggestions |
+
+> **Note:** Patrol tasks run via WorkBuddy or a similar scheduler. You configure what runs and when — the system provides the tools, you define the schedule.
 
 ---
 
@@ -71,10 +61,25 @@ A pure-Python MCP Server with **68 tools** organized into 14 domains:
 ### Prerequisites
 
 - Python 3.10+
-- An AI client that supports MCP (Claude Desktop, Cursor, VS Code, WorkBuddy)
-- Clone this repository
+- An MCP-compatible AI client (Claude Desktop, Cursor, VS Code, WorkBuddy)
+- An Obsidian vault (for your knowledge base)
 
-### Connect Your AI Client
+### 1. Clone
+
+```bash
+git clone https://github.com/edrc-shawn/lingtai.git
+cd lingtai
+```
+
+### 2. Create Your Knowledge Directories
+
+灵台 expects these directories in your vault (not included in the repo — they're your personal data):
+
+```bash
+mkdir -p 丹房 原料 体检 画像 作品
+```
+
+### 3. Connect Your AI Client
 
 Add this to your MCP configuration:
 
@@ -85,9 +90,9 @@ Add this to your MCP configuration:
       "type": "stdio",
       "command": "python",
       "args": [".tool/lingtai-kb/mcp_server.py"],
-      "cwd": "/path/to/灵台/.tool/lingtai-kb",
+      "cwd": "/path/to/lingtai/.tool/lingtai-kb",
       "env": {
-        "LINGTAI_VAULT": "/path/to/灵台"
+        "LINGTAI_VAULT": "/path/to/lingtai"
       }
     }
   }
@@ -100,7 +105,7 @@ Then start a conversation and say: **"调 context_load"** — if it returns know
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `LINGTAI_VAULT` | Recommended | Path to the Obsidian vault root |
+| `LINGTAI_VAULT` | Recommended | Path to your Obsidian vault root |
 | `TAVILY_API_KEY` | Optional | Web search API key |
 | `ANYSEARCH_API_KEY` | Optional | Alternative web search API key |
 | `LINGTAI_CLIENT_ID` | Optional | Client identifier for multi-end scenarios |
@@ -110,26 +115,28 @@ Then start a conversation and say: **"调 context_load"** — if it returns know
 ## Project Structure
 
 ```
-灵台/
-├── AGENTS.md                    # AI rulebook (the "operating manual")
+lingtai/
+├── README.md                    # You are here
+├── LICENSE                      # MIT
+├── AGENTS.md                    # AI rulebook — the operating manual for 灵识
 ├── AGENTS-appendix.md           # Rules appendix + tool reference
-├── .tool/
-│   ├── lingtai-kb/              # MCP Server (116 Python files)
-│   │   ├── mcp_server.py        # Entry point
-│   │   ├── router.py            # JSON-RPC routing
-│   │   ├── server.py            # Core server (12 mixin inheritance)
-│   │   ├── server_mixins/       # 22 mixin modules by domain
-│   │   ├── memory_bank/         # Memory persistence engine
-│   │   └── skillopt/            # Self-evolution engine
-│   └── scripts/                 # 46 utility scripts
-├── 丹房/                         # Knowledge base (13 domains, 269 pages)
-├── 原料/                         # Raw materials (1,215 entries)
-├── 入门/                         # Onboarding docs
+├── .gitignore                   # Excludes personal data directories
+├── .github/                     # GitHub Actions CI
+├── 入门/                         # Onboarding documentation
 ├── 技能/                         # Skill templates (13 skills)
-├── 体检/                         # Health check reports
-├── 画像/                         # User profile (3 layers)
-└── 作品/                         # Published outputs
+└── .tool/
+    ├── lingtai-kb/              # MCP Server (116 Python files)
+    │   ├── README.md            # Server-specific docs + tool catalog
+    │   ├── mcp_server.py        # Entry point
+    │   ├── router.py            # JSON-RPC routing
+    │   ├── server.py            # Core server (12 mixin inheritance)
+    │   ├── server_mixins/       # 22 mixin modules by domain
+    │   ├── memory_bank/         # Memory persistence engine
+    │   └── skillopt/            # Self-evolution engine
+    └── scripts/                 # 46 utility scripts
 ```
+
+> **Your personal directories** (`丹房/`, `原料/`, `体检/`, `画像/`, `作品/`) are excluded from the repo via `.gitignore`. Create them locally after cloning.
 
 ---
 
@@ -139,7 +146,7 @@ Then start a conversation and say: **"调 context_load"** — if it returns know
 
 2. **Infrastructure over model upgrades.** Good memory architecture, context engineering, and observability matter more than switching to a newer LLM.
 
-3. **Self-evolving.** The SkillOpt engine runs nightly at 03:00, analyzing usage patterns and proposing rule refinements. Rules graduate from observations → lessons → hard rules.
+3. **Self-evolving.** The SkillOpt engine analyzes usage patterns and proposes rule refinements. Rules graduate from observations → lessons → hard rules over time.
 
 4. **End-agnostic.** 灵台 produces knowledge, not presentations. Any AI client can consume it — the presentation layer is the client's responsibility.
 
@@ -165,4 +172,4 @@ See [CONTRIBUTING.md](.tool/lingtai-kb/CONTRIBUTING.md) for development guidelin
 
 ## License
 
-[MIT](.tool/lingtai-kb/LICENSE) © 2026 耳东日成
+[MIT](LICENSE) © 2026 耳东日成
