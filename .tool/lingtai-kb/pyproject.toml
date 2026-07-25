@@ -1,0 +1,51 @@
+[project]
+name = "lingtai-kb"
+version = "4.0.0"
+description = "灵台知识库 MCP Server"
+requires-python = ">=3.11"
+# 运行时依赖（语义检索可选，缺失时退化为纯关键词模式）
+dependencies = []
+
+[project.optional-dependencies]
+semantic = ["sentence-transformers>=2.2.0"]
+dev = ["pytest>=7.0", "ruff>=0.4.0"]
+
+# ═══ pytest ═══
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# 超时保护（需 pytest-timeout，可选）
+# timeout = 30
+
+# ═══ ruff（替代 flake8 + isort + black）═══
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",   # line too long（120 已放宽）
+    "E402",   # module import not at top（sys.path.insert 需要）
+    "F401",   # unused import（mixin 导入有副作用）
+    "F841",   # unused variable（调试残留，渐进清理）
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "F811"]
+
+# ═══ mypy（渐进式：先 ignore_missing_imports）═══
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = false
+warn_unused_configs = true
+exclude = ["tests/", "skillopt/", "mcp_server.py.bak"]

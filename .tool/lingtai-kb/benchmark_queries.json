@@ -1,0 +1,62 @@
+[
+  {
+    "query": "含人量",
+    "expected_pages": ["丹房/00-思考与认知/含人量"],
+    "min_score": 0.8,
+    "group": "core"
+  },
+  {
+    "query": "O与π",
+    "expected_pages": ["丹房/00-思考与认知/追问·O与π"],
+    "min_score": 0.8,
+    "group": "core"
+  },
+  {
+    "query": "独立思考",
+    "expected_pages": ["丹房/00-思考与认知/独立思考·框架自觉"],
+    "min_score": 0.8,
+    "group": "core"
+  },
+  {
+    "query": "灵台架构",
+    "expected_pages": ["丹房/07-工具与AI/灵台架构定位分析"],
+    "min_score": 0.8,
+    "group": "core"
+  },
+  {
+    "query": "认知边界",
+    "expected_pages": ["丹房/00-思考与认知/认知边界与生长"],
+    "min_score": 0.8,
+    "group": "core"
+  },
+  {
+    "query": "AI Agent",
+    "expected_pages": [],
+    "min_score": 0.5,
+    "group": "extended"
+  },
+  {
+    "query": "Obsidian",
+    "expected_pages": [],
+    "min_score": 0.5,
+    "group": "extended"
+  },
+  {
+    "query": "记忆系统",
+    "expected_pages": ["丹房/07-工具与AI/灵台认知架构"],
+    "min_score": 0.8,
+    "group": "extended"
+  },
+  {
+    "query": "思维模型",
+    "expected_pages": [],
+    "min_score": 0.5,
+    "group": "extended"
+  },
+  {
+    "query": "含人量 AI 时代",
+    "expected_pages": [],
+    "min_score": 0.5,
+    "group": "extended"
+  }
+]

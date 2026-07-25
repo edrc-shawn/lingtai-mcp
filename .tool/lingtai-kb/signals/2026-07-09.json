@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-09",
+  "time": "19:57",
+  "git": {
+    "count": 37,
+    "domains": {
+      "其他": 8284,
+      "系统基建": 184,
+      "O/π追问": 128,
+      "原料摄入": 43,
+      "体检巡检": 10
+    },
+    "messages": [
+      "增强: fetch_briefing_data.py 新增 daily_sections/daily_flashes + 修复 GBK 编码；早安日报跨分类铺条目+快讯区",
+      "清理: 废弃 context-inject.md + context_inject.py（已被 context_load 替代）",
+      "docs: 丹房日志+oplog — 工程底线加固完成",
+      "feat: knowledge_search 管线条件分支——自动追加日志回溯（v2）",
+      "每日内观 · 2026-07-08 — 钢架焊了四层，自检的胃又空了"
+    ],
+    "friction": 4,
+    "fix_count": 3
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 569,
+    "pending_topics": 569
+  },
+  "continuity": {
+    "yesterday_commits": 0,
+    "recent_keywords": [
+      "二十一个文件",
+      "上午三小时",
+      "一边在给房子焊四层钢架",
+      "读写有门锁了",
+      "承载理解",
+      "进门要过三道检查",
+      "一边那只自动学习的胃又翻了个空",
+      "灵台自传",
+      "崩了还有三套方案接着",
+      "报错有代号了"
+    ]
+  },
+  "raw_material": {
+    "total": 1204,
+    "new_today": 36
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 0 条观察\n- 模式: 0 个\n- 候选: 0 条规则\n- 已验证: 0 条\n- 已评分: 2 条\n- 已暂存: 2 条\n- 教训写入: 0 条\n- 教训增强: 0 条"
+  }
+}

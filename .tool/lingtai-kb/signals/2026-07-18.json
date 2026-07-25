@@ -1,0 +1,39 @@
+{
+  "date": "2026-07-18",
+  "time": "20:55",
+  "git": {
+    "count": 39,
+    "domains": {
+      "原料摄入": 1221,
+      "其他": 163,
+      "O/π追问": 90,
+      "系统基建": 82,
+      "体检巡检": 43
+    },
+    "messages": [
+      "创建: P1测试页（07-工具与AI）",
+      "更新: 丹房/07-工具与AI/P1测试页.md",
+      "创建: P1测试页（07-工具与AI）",
+      "feat: P3 证据契约——搜索结果加 evidence/create_safety/last_updated 字段",
+      "chore: P0 补强优化——修 source_stats bug + 清理 DEBUG 残留 + 增强 prompt"
+    ],
+    "friction": 7,
+    "fix_count": 5
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 0,
+    "pending_topics": 0
+  },
+  "continuity": {
+    "yesterday_commits": 0
+  },
+  "raw_material": {
+    "total": 1,
+    "new_today": 1
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 0 条观察\n- 模式: 0 个\n- 候选: 0 条规则\n- 已验证: 0 条\n- 已评分: 0 条\n- 已暂存: 0 条\n- 教训写入: 5 条\n- 教训增强: 0 条"
+  }
+}

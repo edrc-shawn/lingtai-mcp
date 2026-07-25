@@ -1,0 +1,160 @@
+# ── 灵台 MCP Server ──────────────────────────────────
+# 语义检索模型缓存（91.9 MB，一次性下载后永不联网）
+.tool/lingtai-kb/memory_bank/model_cache/
+
+# 运行时缓存（LLM 查询、摘要树、基准等）
+.tool/lingtai-kb/.cache/
+
+# 记忆银行数据（运行时数据，git 不跟踪；含自动备份）
+.tool/lingtai-kb/memory_bank/data/
+.tool/lingtai-kb/memory_bank/backups/
+
+# 运行日志（工具调用、搜索统计、宏使用等）
+.tool/lingtai-kb/logs/
+
+# 运行时数据（画像、反馈、注册表等）
+.tool/lingtai-kb/data/
+
+# 嵌入向量缓存（重建索引时不丢失）
+.tool/lingtai-kb/cache/
+
+# 启动标记（服务器写入的运行时文件）
+.tool/lingtai-kb/.startup_marker
+
+# 测试缓存
+.tool/lingtai-kb/.pytest_cache/
+.tool/lingtai-kb/tests/.pytest_cache/
+
+# 简报缓存 + 权重缓存
+.tool/cache/
+.tool/lingtai-kb/weights/
+
+# 备份文件
+*.bak
+*.py.bak
+
+# 环境变量文件（含 API 密钥）
+.env
+.env.local
+.env.*
+
+# 但 .env.example 需纳入版本控制
+!.env.example
+
+# API 密钥文件
+.tool/config/api_keys.json
+reasonix.toml
+存档/API/*.txt
+存档/API/*.json
+.git
+.code-graph/
+
+# ── 路径迁移缓存 ────────────────────────────────────
+# 灵识运行时缓存
+.lingtai/
+
+# 运行时元数据（丹房/画像等目录下的 .meta/）
+**/.meta/
+
+# code/ 是 .tool/lingtai-kb/ 的副本，不重复跟踪
+code/
+
+# ── Obsidian 运行时状态 ─────────────────────────────
+# 插件二进制文件（28MB，不应跟踪）
+.obsidian/plugins/
+# 工作区状态（自动保存的 workspace 副本）
+.obsidian/workspace*
+.obsidian/workspace-mobile.json
+.obsidian/workspaces.json
+.obsidian/workspace(*).json
+# 图谱状态（自动保存的 graph 副本）
+.obsidian/graph *.json
+.obsidian/graph(*).json
+
+# Obsidian workspace / cache (matches at any level)
+**/.obsidian/workspace*
+**/.obsidian/graph*
+**/.obsidian/backlink.json
+**/.obsidian/cache
+**/.obsidian/plugins/
+
+# 用户指令：.obsidian 整体不跟踪（含 app/appearance/community-plugins/core-plugins/types 等配置）
+.obsidian/
+
+# Trash
+.trash/
+
+# ── Reasonix 运行时数据 ────────────────────────────
+.reasonix/
+
+# ── WorkBuddy 运行时数据 ──────────────────────────
+.workbuddy/
+
+# 但技能文件需要Git追踪
+!.workbuddy/skills/
+!.workbuddy/skills/**
+
+# Git remote (bare repo lives outside vault)
+.git-remote/
+
+# ── 通用缓存 ───────────────────────────────────────
+__pycache__/
+node_modules/
+*.pyd
+
+# ── 用户知识库数据（个人内容，非开源范围） ─────────
+原料/
+丹房/
+画像/
+存档/
+简报/
+体检/
+作品/
+待办.md
+灵台功能全景.md
+
+# ── 运行时诊断报告 ─────────────────────────────────
+.wikilink_diag/
+
+# ── 巡更观测数据（个人运行时数据） ─────────────────
+.tool/lingtai-kb/observation/
+.tool/lingtai-kb/profile.json
+
+# ── 内部运维脚本（含个人路径，非通用） ───────────
+.tool/scripts/
+.tool/巡更/
+.tool/hook-summaries/
+.tool/code-graph-wrapper.ps1
+.tool/lingtai-kb/restart.bat
+.tool/lingtai-kb/start-mcp-proxy.bat
+.tool/locomo_test/
+入门/.lingtai-favorites.json
+
+# ── 历史遗留 ────────────────────────────────────────
+# 灵台/ 子目录已废弃，不再跟踪
+灵台/
+
+# 巡更 pending 动态基线历史（运行时统计快照，不跟踪）
+.tool/巡更/pending_baseline_history.json
+# 巡更运行时日志（自愈等自动生成，不跟踪）
+.tool/巡更/*.jsonl
+
+# 临时文件
+temp_*.txt
+
+# 运行时同步状态（post-commit hook 自动更新）
+.tool/lingtai-kb/sync_state.json
+
+# 早安日报内部缓存（生成过程文件，不跟踪）
+.tool/hook-summaries/
+
+# 画像运行时缓存（自动生成，不跟踪）
+.tool/lingtai-kb/profile/user_profile.json
+
+# skillopt 进化日志（自动生成，不跟踪）
+.tool/lingtai-kb/skillopt/changelog.md
+# 排除：本地运行时/IDE配置（不进知识库）
+.mimocode/
+
+# FTS5 全文索引数据库（运行时生成，可重建）
+.tool/lingtai-kb/.fts5.db*

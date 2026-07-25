@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "lingtai-kb": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "cwd": ".",
+      "env": {
+        "LINGTAI_VAULT": "../..",
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

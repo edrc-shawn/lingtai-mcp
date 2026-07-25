@@ -1,0 +1,208 @@
+/* 耳东主题 — 粗糙纸盒感 · 暖调 */
+:root {
+  --card-bg: #f5f0e8;
+  --card-width: 1080px;
+  --card-padding: 64px 56px;
+  --accent: #8b6914;
+  --accent-light: #c4a55a;
+  --text-primary: #2c2416;
+  --text-secondary: #7a6e5a;
+  --text-muted: #a89e8a;
+  --border-color: #e0d5c0;
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  --font-body: 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
+  --line-height: 1.75;
+  --h1-size: 36px;
+  --h2-size: 28px;
+  --body-size: 18px;
+  --small-size: 14px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--card-bg);
+  width: var(--card-width);
+  min-height: 1920px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-padding);
+  color: var(--text-primary);
+  line-height: var(--line-height);
+  position: relative;
+}
+
+/* 纹理噪点背景（粗糙感） */
+body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  pointer-events: none;
+}
+
+/* ── 顶部用户栏 ── */
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 32px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nickname {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.user-id {
+  font-size: var(--small-size);
+  color: var(--text-muted);
+}
+
+/* ── 正文 ── */
+.content {
+  flex: 1;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: var(--h1-size);
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-size: var(--h2-size);
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 28px;
+  margin-bottom: 14px;
+  padding-left: 14px;
+  border-left: 4px solid var(--accent-light);
+  line-height: 1.4;
+}
+
+h3 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+p {
+  margin-bottom: 14px;
+  font-size: var(--body-size);
+}
+
+strong { font-weight: 700; color: var(--text-primary); }
+em { font-style: italic; }
+
+/* 列表 */
+ul, ol {
+  padding-left: 24px;
+  margin-bottom: 14px;
+  font-size: var(--body-size);
+}
+li { margin-bottom: 6px; }
+li::marker { color: var(--accent-light); }
+
+/* 引用 */
+blockquote {
+  margin: 16px 0;
+  padding: 12px 20px;
+  background: rgba(196, 165, 90, 0.08);
+  border-left: 4px solid var(--accent-light);
+  border-radius: 0 8px 8px 0;
+  font-size: var(--body-size);
+  color: var(--text-secondary);
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+/* 代码 */
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 15px;
+  background: rgba(0,0,0,0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+pre {
+  margin: 16px 0;
+  padding: 16px 20px;
+  background: #2c2416;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+pre code {
+  background: transparent;
+  color: #e0d5c0;
+  padding: 0;
+  font-size: 14px;
+}
+
+/* 分割线 */
+hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 24px 0;
+}
+
+/* ── 页脚 ── */
+.footer {
+  text-align: center;
+  padding-top: 28px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 32px;
+  font-size: var(--small-size);
+  color: var(--text-muted);
+}
+.footer .brand {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ── 页码 ── */
+.page-num {
+  position: absolute;
+  bottom: 28px;
+  right: 40px;
+  font-size: 12px;
+  color: var(--text-muted);
+}

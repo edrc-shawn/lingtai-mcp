@@ -1,0 +1,27 @@
+{
+  "date": "2026-07-22",
+  "time": "20:26",
+  "git": {
+    "count": 0,
+    "domains": {},
+    "messages": [],
+    "friction": 0,
+    "fix_count": 0
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 0,
+    "pending_topics": 0
+  },
+  "continuity": {
+    "yesterday_commits": 0
+  },
+  "raw_material": {
+    "total": 1242,
+    "new_today": 3
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 346 条观察\n- 模式: 9 个\n- 候选: 2 条规则\n- 已验证: 2 条\n- 已评分: 2 条\n- 已暂存: 2 条\n- 教训写入: 5 条\n- 教训增强: 0 条"
+  }
+}

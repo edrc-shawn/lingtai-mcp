@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-12",
+  "time": "19:56",
+  "git": {
+    "count": 22,
+    "domains": {
+      "其他": 120,
+      "系统基建": 108,
+      "O/π追问": 47,
+      "体检巡检": 3,
+      "内容产出": 2
+    },
+    "messages": [
+      "docs: AGENTS.md 规则⑤增加第四层 fulltext_search 搜索",
+      "对齐: 13个skill description全部改为第三人称触发句(D1) + _skill规范.md修复(参考/→references/ + 补context_load段) + gen_skill_index.py修耳东日成写作路径",
+      "fix: 可答性门控阈值 + 语义补召误拦（locomo_core follow-up）",
+      "feat: memory_write 写时增强 + memory_search 倒排索引 + matched_reason",
+      "内观 · 2026-07-11——说\"不\"没用除非说清拒绝的是哪一个（黑名单缺匹配字段致被拒规则反复重现，根因修复）"
+    ],
+    "friction": 5,
+    "fix_count": 3
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 570,
+    "pending_topics": 570
+  },
+  "continuity": {
+    "yesterday_commits": 0,
+    "recent_keywords": [
+      "这个不要",
+      "本身就没用",
+      "灵台自传",
+      "翻完八百多条行为",
+      "夜里那套自动复盘",
+      "承载理解",
+      "把我早就划掉的那条",
+      "又原封不动推回我面前",
+      "它每天都当没听见",
+      "我每天都对它说"
+    ]
+  },
+  "raw_material": {
+    "total": 1214,
+    "new_today": 1
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 900 条观察\n- 模式: 17 个\n- 候选: 3 条规则\n- 已验证: 3 条\n- 已评分: 3 条\n- 已暂存: 3 条\n- 教训写入: 4 条\n- 教训增强: 0 条"
+  }
+}

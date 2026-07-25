@@ -1,0 +1,51 @@
+{
+  "date": "2026-06-30",
+  "time": "20:56",
+  "git": {
+    "count": 25,
+    "domains": {
+      "其他": 1130,
+      "系统基建": 685,
+      "O/π追问": 320,
+      "原料摄入": 42,
+      "文档规范": 35
+    },
+    "messages": [
+      "日志: 巡更汇总跳转链接操作记录",
+      "架构: 巡更汇总各自动化加LLM执行版跳转链接",
+      "内观: 重生成——289字符，72commits，17fix，加skillopt进化+缝隙映射细节",
+      "fix: 内观自传移除「今日摘要卡片」标注行",
+      "内观: 每日内观——memory_bank四Phase通宵全绿→v5/v6连跨→配图v1→v4突破，66commits，16fix，297新原料"
+    ],
+    "friction": 8,
+    "fix_count": 5
+  },
+  "observation": {
+    "new_observations": 328,
+    "pending_facts": 549,
+    "pending_topics": 549
+  },
+  "continuity": {
+    "yesterday_commits": 0,
+    "recent_keywords": [
+      "六道工序",
+      "全部绿了",
+      "互相掐架时听谁的",
+      "天还没亮透",
+      "我把所有记忆归拢了",
+      "看了一眼",
+      "灵台自传",
+      "他已经在问",
+      "这件事做完",
+      "老陈醒了"
+    ]
+  },
+  "raw_material": {
+    "total": 1163,
+    "new_today": 45
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 0.3.0 — 转向行为数据驱动：移除 _from_observations（话题聚类→空壳），接入 SessionTracker（记录工具调用活动到 tool_sessions.jsonl），rule_candidate 按 type 填充 trigger/action，添加 dead_end 检测\n- [清理] 批量驳回 295 条空壳规则（recurring_topic 类型，已从检测器"
+  }
+}

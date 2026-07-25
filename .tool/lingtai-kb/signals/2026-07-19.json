@@ -1,0 +1,39 @@
+{
+  "date": "2026-07-19",
+  "time": "20:34",
+  "git": {
+    "count": 77,
+    "domains": {
+      "原料摄入": 37826,
+      "系统基建": 6352,
+      "其他": 5917,
+      "O/π追问": 5087,
+      "内容产出": 2645
+    },
+    "messages": [
+      "refine: 补充沟通指南——回复长度感知 + 不推断时段",
+      "refine: 提炼全流程整合入 AGENTS.md §四 实操速查",
+      "skillopt: 每日睡眠进化 1902; fix(evolve_engine): 修复 green_rules NameError 致 skillopt_run 崩溃",
+      "更新: 丹房/日志.md",
+      "内观 · 2026-07-18 — 体检单误报记忆抽屉快空(报4/实149)，回环07-17镜子说谎"
+    ],
+    "friction": 13,
+    "fix_count": 7
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 0,
+    "pending_topics": 0
+  },
+  "continuity": {
+    "yesterday_commits": 0
+  },
+  "raw_material": {
+    "total": 1,
+    "new_today": 0
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 335 条观察\n- 模式: 0 个\n- 候选: 0 条规则\n- 已验证: 0 条\n- 已评分: 0 条\n- 已暂存: 0 条\n- 教训写入: 5 条\n- 教训增强: 0 条"
+  }
+}

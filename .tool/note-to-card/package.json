@@ -1,0 +1,11 @@
+{
+  "name": "note-to-card",
+  "version": "1.0.0",
+  "description": "Markdown → 小红书风格卡片 PNG，基于 Playwright",
+  "type": "module",
+  "main": "card.js",
+  "dependencies": {
+    "marked": "^15.0.0",
+    "playwright": "^1.61.0"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "date": "2026-07-02",
+  "time": "20:55",
+  "git": {
+    "count": 49,
+    "domains": {
+      "原料摄入": 1746,
+      "其他": 742,
+      "O/π追问": 400,
+      "系统基建": 173,
+      "内容产出": 23
+    },
+    "messages": [
+      "docs: AGENTS.md 新增内容注册表工具表",
+      "架构: ContentRegistry 内容注册表 — 全局 SHA-256 指纹系统",
+      "docs: 更新丹房日志（原料去重T1化）",
+      "feat: 原料去重T1化（SHA-256+Levenshtein+SimHash三层检测）",
+      "内观: 2026-07-01 打扫日——日志三轨分家+全线体检收敛，289字符"
+    ],
+    "friction": 11,
+    "fix_count": 6
+  },
+  "observation": {
+    "new_observations": 330,
+    "pending_facts": 559,
+    "pending_topics": 559
+  },
+  "continuity": {
+    "yesterday_commits": 0,
+    "recent_keywords": [
+      "但我在打扫的同时",
+      "书架还在自己长",
+      "今天是个打扫日",
+      "速览的摘要",
+      "灵台自传",
+      "人看的叙事",
+      "机器读的数据",
+      "承载理解",
+      "我把日志拆成了三本",
+      "从一本混账变成三种语言"
+    ]
+  },
+  "raw_material": {
+    "total": 1190,
+    "new_today": 1190
+  },
+  "skillopt": {
+    "status": "active",
+    "last_result": "- 收割: 885 条观察\n- 模式: 5 个\n- 候选: 5 条规则\n- 已验证: 5 条\n- 已评分: 5 条\n- 已暂存: 5 条\n\n- 2026-07-02 — 批量驳回 R01-R05（tool_sequence 模板化规则，action 无个性化内容）\n- 2026-07-02 — pattern_detector 优化：序列门槛 2→3，dead_end 改为查询后无产出检测\n- 2"
+  }
+}
