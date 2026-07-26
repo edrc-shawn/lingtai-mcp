@@ -1,7 +1,7 @@
 main:
   push:
     - imports:
-        - https://cnb.cool/edrc.shawn/lingtai-secrets/-/blob/main/gitee-secrets.yml
+        - https://cnb.cool/edrc.shawn/lingtai-data/-/blob/main/gitee-secrets.yml
       stages:
         - name: mirror to gitee
           script: |
