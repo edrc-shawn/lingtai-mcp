@@ -28,6 +28,7 @@ log = get_logger(__name__)
 _MIN_SIM = 0.6       # 最低相似度（低于此 = 噪音）
 _MAX_SIM = 0.75      # 最高相似度（高于此 = 重复）
 _TOP_N_DEFAULT = 20  # 默认返回条数
+_TITLE_OVERLAP_THRESHOLD = 0.5  # 标题 bigram 重叠超过此值视为重复
 _CACHE_FILENAME = "danfang_embeddings.json"
 
 
@@ -44,6 +45,26 @@ def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     if na == 0 or nb == 0:
         return 0.0
     return float(np.dot(a, b) / (na * nb))
+
+
+def _title_overlap(t1: str, t2: str) -> float:
+    """计算两个标题的重叠度，用于检测同主题重复。
+
+    两阶段检测：
+    1. 子串包含：一方是另一方的子串 → 强重复信号（返回 1.0）
+    2. 字符集 Jaccard：适用于标题共享核心词但措辞不同的情况
+    """
+    if not t1 or not t2:
+        return 0.0
+    # 1. 子串检查
+    if t1 in t2 or t2 in t1:
+        return 1.0
+    # 2. 字符集 Jaccard
+    s1 = set(t1.replace(" ", ""))
+    s2 = set(t2.replace(" ", ""))
+    if not s1 or not s2:
+        return 0.0
+    return len(s1 & s2) / len(s1 | s2)
 
 
 def _load_cache(vault_path: str) -> dict:
@@ -228,23 +249,39 @@ def collide(
 
     # 按相似度降序排列
     collisions.sort(key=lambda x: x["similarity"], reverse=True)
-    collisions = collisions[:top_n]
+
+    # ── 标题去重分离：标题高度重叠的移至 duplicates ──
+    true_collisions = []
+    duplicates = []
+    for c in collisions:
+        overlap = _title_overlap(c["title_a"], c["title_b"])
+        if overlap >= _TITLE_OVERLAP_THRESHOLD:
+            c["title_overlap"] = round(overlap, 4)
+            c["reason"] = _generate_duplicate_reason(c)
+            duplicates.append(c)
+        else:
+            true_collisions.append(c)
+
+    true_collisions = true_collisions[:top_n]
+    duplicates = duplicates[:top_n]
 
     # 为每个碰撞对生成简短理由
-    for c in collisions:
+    for c in true_collisions:
         c["reason"] = _generate_reason(c)
 
     return {
         "total_pages": len(pages),
         "pages_embedded": len(vectors),
         "pairs_evaluated": all_pairs_evaluated,
-        "collisions": collisions,
+        "collisions": true_collisions,
+        "duplicates": duplicates,
         "stats": {
             "min_similarity": min_sim,
             "max_similarity": max_sim,
             "top_n": top_n,
             "domain_filter": domain_filter or "全部",
             "domain_skip_same": domain_skip_same,
+            "duplicates_filtered": len(duplicates),
         },
     }
 
@@ -260,6 +297,11 @@ def _generate_reason(c: dict) -> str:
     da_short = da.split("-", 1)[-1] if "-" in da else da
     db_short = db.split("-", 1)[-1] if "-" in db else db
     return f"跨域关联：{da_short} × {db_short}，语义相似度 {c['similarity']:.3f}，有关联但视角不同"
+
+
+def _generate_duplicate_reason(c: dict) -> str:
+    """为重复对生成简短理由。"""
+    return f"疑似重复：标题重叠度 {c.get('title_overlap', 0):.2f}，建议合并或去重"
 
 
 def apply_collision(

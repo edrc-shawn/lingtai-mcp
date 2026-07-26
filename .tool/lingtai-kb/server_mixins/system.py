@@ -882,6 +882,7 @@ class SystemMixin:
             'server_mixins.user_profile', 'server_mixins.kar',
             'server_mixins.llm', 'server_mixins.skillopt',
             'server_mixins.check_point', 'server_mixins.output',
+            'server_mixins.concept_collision',
             'server_mixins.health_indicators', 'server_mixins.macro_tracker',
             'reasoning_engine', 'llm_reasoning',
             'skillopt.evolve_engine', 'skillopt.pattern_detector',
