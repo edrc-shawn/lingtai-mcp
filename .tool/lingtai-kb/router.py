@@ -267,6 +267,9 @@ def _mw_initialize(state):
     try:
         ci = state["params"].get("clientInfo") or {}
         cname = ci.get("name") or os.environ.get("LINGTAI_CLIENT_ID", "unknown")
+        # 端标识归一化：connector 层桥接的端记实际名
+        _CLIENT_ALIAS = {"connector:custom-mcp:lingtai-kb": "workbuddy"}
+        cname = _CLIENT_ALIAS.get(cname, cname)
         server.set_client(cname, ci.get("version"))
     except Exception:
         pass
