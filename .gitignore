@@ -122,7 +122,7 @@ node_modules/
 
 # ── 内部运维脚本（含个人路径，非通用） ───────────
 .tool/scripts/
-.tool/巡更/
+# .tool/巡更/ 已纳入 git 跟踪（执行指令不含敏感信息，需备份）
 .tool/hook-summaries/
 .tool/code-graph-wrapper.ps1
 .tool/lingtai-kb/restart.bat
