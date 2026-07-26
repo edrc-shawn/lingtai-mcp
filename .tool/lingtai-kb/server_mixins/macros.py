@@ -480,6 +480,105 @@ class MacroMixin:
             "suggestion": suggestion,
         }
 
+
+    # ─── health_check: 健康检查宏 ───
+
+    @tool(readonly=True, write=False, category="macro", system=False)
+    def health_check(
+        self,
+        scope: str = "full",
+        stale_days: int = 30,
+        min_backlinks: int = 3,
+        min_similarity: float = 0.6,
+        max_similarity: float = 0.75,
+    ) -> dict:
+        """健康检查宏：聚合 4 个子体检一步完成
+
+        把「先 health_inspect、再 knowledge_gaps、再 heatmap、再 lifecycle_scan、再 reflect」
+        的 5 次独立调用压缩为 1 次原子宏调用。
+
+        Args:
+            scope: "full"（全量，默认） / "quick"（仅聚合近期扫描结果）
+            stale_days: 陈旧阈值
+            min_backlinks: 最低入链数
+            min_similarity: 关联检测最低相似度
+            max_similarity: 关联检测最高相似度
+
+        Returns:
+            dict: 聚合健康报告
+        """
+        macro_id = self._macro_id("health_check", str(scope))
+        steps = []
+        has_error = False
+
+        # 步骤 1: knowledge_gaps
+        try:
+            gaps_result = self.gaps()
+            pending = gaps_result.get("pending", 0) if isinstance(gaps_result, dict) else 0
+            steps.append({"step": "knowledge_gaps", "status": "ok",
+                          "pending_raw": pending,
+                          "summary": f"待提炼原料: {pending} 篇"})
+        except Exception as e:
+            steps.append({"step": "knowledge_gaps", "status": "error", "error": str(e), "retryable": True})
+            has_error = True
+
+        # 步骤 2: knowledge_heatmap
+        try:
+            heatmap_result = self.heatmap(top_n=10)
+            top_pages = heatmap_result.get("pages", [])[:5] if isinstance(heatmap_result, dict) else []
+            steps.append({"step": "knowledge_heatmap", "status": "ok",
+                          "top_hot_pages": [p.get("title", "") for p in top_pages],
+                          "summary": f"热度扫描完成: Top {min(5, len(top_pages))} 活跃页"})
+        except Exception as e:
+            steps.append({"step": "knowledge_heatmap", "status": "warn", "error": str(e),
+                          "summary": "热度扫描失败（非致命）"})
+
+        # 步骤 3: lifecycle_scan
+        try:
+            lifecycle_result = self.lifecycle_scan(stale_days=stale_days, min_backlinks=min_backlinks, mode="both")
+            pc = lifecycle_result.get("candidates", lifecycle_result.get("page_scan", {}).get("candidates", [])) if isinstance(lifecycle_result, dict) else []
+            rc = lifecycle_result.get("raw_scan", {}).get("cold_raw_candidates", lifecycle_result.get("raw_coldness", [])) if isinstance(lifecycle_result, dict) else []
+            steps.append({"step": "lifecycle_scan", "status": "ok",
+                          "page_candidates": len(pc), "raw_candidates": len(rc),
+                          "summary": f"生命周期扫描: {len(pc)} 可降级页, {len(rc)} 冷原料"})
+        except Exception as e:
+            steps.append({"step": "lifecycle_scan", "status": "warn", "error": str(e),
+                          "summary": "生命周期扫描跳过（非致命）"})
+
+        # 步骤 4: concept_collide
+        try:
+            cc_result = self.concept_collide(mode="page", top_n=5, min_similarity=min_similarity, max_similarity=max_similarity)
+            collisions = cc_result.get("collisions", []) if isinstance(cc_result, dict) else []
+            top_hits = [f"{c.get('domain_a','?')}×{c.get('domain_b','?')} ({c.get('similarity',0):.3f})" for c in collisions[:3]]
+            steps.append({"step": "concept_collide", "status": "ok",
+                          "collisions": len(collisions), "top_hits": top_hits,
+                          "summary": f"概念碰撞: {len(collisions)} 对跨域关联" if collisions else "概念碰撞: 无高价值跨域关联"})
+        except Exception as e:
+            steps.append({"step": "concept_collide", "status": "skipped",
+                          "summary": f"概念碰撞暂不可用: {str(e)[:60]}"})
+
+        # 步骤 5: observation_reflect
+        try:
+            reflect_result = self.reflect()
+            findings = sum(len(v) for v in reflect_result.values() if isinstance(v, list)) if isinstance(reflect_result, dict) else 0
+            steps.append({"step": "observation_reflect", "status": "ok",
+                          "findings": findings,
+                          "summary": f"全量反思: 发现 {findings} 个待关注项"})
+        except Exception as e:
+            steps.append({"step": "observation_reflect", "status": "warn", "error": str(e),
+                          "summary": "反思失败（非致命）"})
+
+        overall = "error" if has_error else "ok"
+        result = {"macro": "health_check", "macro_id": macro_id, "overall": overall,
+                  "scope": scope, "steps": steps,
+                  "summary": f"健康检查完成：{sum(1 for s in steps if s['status'] == 'ok')} ok / "
+                             f"{sum(1 for s in steps if 'warn' in s['status'] or 'skipped' in s['status'])} warn / "
+                             f"{sum(1 for s in steps if s['status'] == 'error')} error"}
+        try:
+            self._macro_tracker.record_macro("health_check", steps, client=getattr(self, 'client', ''))
+        except Exception:
+            log.debug("suppressed", exc_info=True)
+        return result
     # ─── session_end: 会话收尾宏 ───
 
     @tool(readonly=False, write=True, category="macro", system=False)
@@ -583,7 +682,30 @@ class MacroMixin:
                 lines.append(f"  决策：{feedback_what}{direction}")
             if user_push_key and user_push_value:
                 lines.append(f"  偏好：{user_push_key}={user_push_value}")
-            # 自动扫本次会话的 git commit，嵌入工作印记
+            # 自动扫本次会话的 git commit，嵌
+            # ═══ P3: 扫描本轮写操作，嵌入工作印记 ═══
+            _write_tools = frozenset({
+                'page_create', 'page_update', 'page_append_section',
+                'raw_save', 'refine_mark', 'memory_write', 'knowledge_inject',
+            })
+            _session_records = []
+            try:
+                from server_mixins.stub_manager import stub_tool_sessions
+                records = stub_tool_sessions.read_tail(vault, n=200)
+                for rec in records:
+                    ts = rec.get("timestamp", "")
+                    if session_start and ts < session_start:
+                        continue
+                    for tc in rec.get("tool_calls", []):
+                        tname = tc.get("name", "")
+                        if tname in _write_tools:
+                            _session_records.append(f"  {tname}: {tc.get('args', {})}")
+                if _session_records:
+                    lines.append("  本轮写操作：")
+                    for r_line in _session_records[:15]:
+                        lines.append(r_line[:120])
+            except Exception:
+                log.debug("suppressed", exc_info=True)
             if session_start:
                 try:
                     vault = getattr(self, 'vault_path', None) or r"."

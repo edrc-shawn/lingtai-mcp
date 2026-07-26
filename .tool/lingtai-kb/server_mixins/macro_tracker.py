@@ -24,6 +24,7 @@ from collections import defaultdict
 MACRO_ATOMIC_MAP = {
     "knowledge_recall": {"knowledge_inject", "knowledge_search", "kb_search", "kb_query", "kar_unified", "kar_chain"},
     "session_end": {"user_feedback", "user_push", "raw_save", "perception_save", "memory_write", "mem_write"},
+    "health_check": {"health_inspect", "knowledge_gaps", "knowledge_heatmap", "lifecycle_scan", "concept_collide", "observation_reflect"},
 }
 
 # 原子工具 → 归属宏（反向映射）

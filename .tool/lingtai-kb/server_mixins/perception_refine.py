@@ -28,28 +28,21 @@ class RefineMixin:
         return os.path.join(self.vault_path, '.lingtai', 'refine-map.json')
 
     def _read_refine_map(self):
-        """读取 refine-map.json（mtime 缓存，避免重复 I/O）"""
-        import json, os
-        path = self._refine_map_path()
-        if not os.path.exists(path):
-            return {}
-        mtime = os.path.getmtime(path)
-        cache = getattr(self, '_refine_map_cache', None)
-        if cache and cache[0] == mtime:
-            return cache[1]
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        self._refine_map_cache = (mtime, data)
-        return data
+        """读取 refine-map.json（走 stub 缓存，避免同一流程中重复解析）"""
+        from server_mixins.stub_manager import stub_refine_map
+        return stub_refine_map.read(self.vault_path)
 
     def _write_refine_map(self, data):
         """写入 refine-map.json 并刷新缓存"""
         import json, os
         path = self._refine_map_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        tmp = path + ".tmp"
+        with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        self._refine_map_cache = (os.path.getmtime(path), data)
+        os.replace(tmp, path)
+        from server_mixins.stub_manager import stub_refine_map
+        stub_refine_map.invalidate()
 
     @tool(readonly=True, write=False, category="refine", system=False, name="refine_status")
     def refine_status(self, raw_path: str = "", mode: str = "single", target: str = "", domain: str = "") -> dict:
