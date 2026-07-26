@@ -1395,18 +1395,44 @@ class KnowledgeMixin:
         }
 
     @tool(readonly=True, write=False, category="concept", system=False)
-    def lifecycle_scan(self, stale_days: int = 30, min_backlinks: int = 3) -> dict:
-        """知识生命周期扫描——检测可降级/可清理的页面候选。
+    def lifecycle_scan(self, stale_days: int = 30, min_backlinks: int = 3, mode: str = "page") -> dict:
+        """知识生命周期扫描——检测可降级/可清理的候选。
 
-        条件：下品 + 入链 < min_backlinks + 超过 stale_days 未更新。
+        mode="page"（默认）：丹房页面降级扫描（下品+少入链+陈旧）
+        mode="raw"：原料冷度扫描（长期未提炼+无回链，对齐规则 16b）
+        mode="both"：同时返回页面和原料两个维度
 
         Args:
-            stale_days: 陈旧阈值（天）
-            min_backlinks: 最低入链数
+            stale_days: 陈旧阈值（天，page 模式默认 30，raw 模式默认 60）
+            min_backlinks: 最低入链数（仅 page 模式）
+            mode: 扫描模式
 
         Returns:
-            dict: 降级候选列表
+            dict: 候选列表
         """
+        if mode == "raw":
+            return concept_collision.raw_coldness_scan(
+                vault_path=self.vault_path,
+                stale_days=stale_days if stale_days != 30 else 60,
+                max_results=30,
+            )
+        elif mode == "both":
+            page_result = concept_collision.lifecycle_scan(
+                vault_path=self.vault_path,
+                pages=self.memory.pages,
+                stale_days=stale_days,
+                min_backlinks=min_backlinks,
+            )
+            raw_result = concept_collision.raw_coldness_scan(
+                vault_path=self.vault_path,
+                stale_days=60,
+                max_results=20,
+            )
+            return {
+                "page_scan": page_result,
+                "raw_scan": raw_result,
+                "mode": "both",
+            }
         return concept_collision.lifecycle_scan(
             vault_path=self.vault_path,
             pages=self.memory.pages,

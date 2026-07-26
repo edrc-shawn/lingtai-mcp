@@ -586,3 +586,157 @@ def lifecycle_scan(
             "min_backlinks": min_backlinks,
         },
     }
+
+
+def raw_coldness_scan(
+    vault_path: str,
+    stale_days: int = 60,
+    max_results: int = 30,
+) -> dict:
+    """原料冷度扫描——检测长期未提炼的原料，落实规则 16b（定期减负）。
+
+    冷度评分维度：
+    1. 年龄分：距「日期」frontmatter 的天数 / 365（归一化 0-1）
+    2. 状态乘数：未标注 ×2.0 / 待提炼 ×1.5 / 已提炼 ×0.3
+    3. 无回链乘数：无「回链」字段 ×1.3
+    4. 短内容乘数：< 200 字 ×1.2（碎片原料，价值低）
+
+    Args:
+        vault_path: vault 根路径
+        stale_days: 至少冷于此天数才纳入扫描（默认 60 天）
+        max_results: 最多返回条数
+
+    Returns:
+        dict: {
+            "candidates": [{filename, title, coldness, age_days, status, has_backlink, reason}],
+            "stats": {total_raw, processed, unprocessed, no_status, candidates}
+        }
+    """
+    import os, re
+    from datetime import datetime, timezone
+
+    raw_dir = os.path.join(vault_path, "原料")
+    if not os.path.isdir(raw_dir):
+        return {"error": "原料目录不存在", "candidates": [], "stats": {}}
+
+    now = datetime.now(timezone.utc)
+    files = [f for f in os.listdir(raw_dir) if f.endswith('.md')]
+
+    stats = {
+        "total_raw": len(files),
+        "processed": 0,
+        "unprocessed": 0,
+        "no_status": 0,
+        "candidates": 0,
+        "oldest_age_days": 0,
+    }
+
+    # 辅助：从正文提取「创建于：YYYY-MM-DD」日期
+    BODY_DATE_RE = re.compile(r'创建于[：:]\s*(\d{4}-\d{2}-\d{2})')
+    # 辅助：frontmatter 字段提取
+    FM_RE = re.compile(r'^([\w\u4e00-\u9fff]+)\s*[:：]\s*(.+)', re.MULTILINE)
+
+    candidates = []
+
+    for fname in files:
+        fpath = os.path.join(raw_dir, fname)
+        try:
+            with open(fpath, 'r', encoding='utf-8-sig') as fp:
+                content = fp.read()
+        except Exception:
+            continue
+
+        # 解析 frontmatter（取第一个 --- 块）
+        fm = {}
+        fm_match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+        if fm_match:
+            for m in FM_RE.finditer(fm_match.group(1)):
+                fm[m.group(1).strip()] = m.group(2).strip()
+
+        # ── 年龄计算 ──
+        date_str = fm.get('日期', '') or fm.get('date', '')
+        if not date_str:
+            # 回退到正文「创建于」日期
+            body_m = BODY_DATE_RE.search(content)
+            if body_m:
+                date_str = body_m.group(1)
+        if not date_str:
+            # 回退到文件 mtime
+            try:
+                mtime = os.path.getmtime(fpath)
+                date_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
+                age_days = (now - date_dt).days
+            except OSError:
+                age_days = 0
+        else:
+            try:
+                date_dt = datetime.strptime(date_str[:10], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                age_days = (now - date_dt).days
+            except ValueError:
+                age_days = 0
+
+        # ── 状态判定 ──
+        status_raw = fm.get('处理状态', '') or fm.get('状态', '')
+        is_refined = '已提炼' in status_raw
+        is_unprocessed = '待提炼' in status_raw
+        has_status = bool(status_raw)
+
+        if is_refined:
+            stats["processed"] += 1
+            status = "已提炼"
+            status_mult = 0.3
+        elif is_unprocessed:
+            stats["unprocessed"] += 1
+            status = "待提炼"
+            status_mult = 1.5
+        else:
+            stats["no_status"] += 1
+            status = "未标注"
+            status_mult = 2.0
+
+        if age_days < stale_days:
+            continue  # 不够冷，跳过
+
+        # ── 回链检测 ──
+        has_backlink = bool(fm.get('回链', ''))
+
+        # ── 内容长度 ──
+        body_start = content.find('---\n', content.find('---') + 3)
+        body_text = content[body_start + 4:] if body_start >= 0 else content
+        word_count = len(re.sub(r'\s+', '', body_text))
+        short_mult = 1.2 if word_count < 200 else 1.0
+
+        # ── 冷度评分 ──
+        age_score = min(age_days / 365, 1.0)  # 0-1，超过 1 年封顶
+        coldness = round(age_score * status_mult * (1.3 if not has_backlink else 1.0) * short_mult, 3)
+
+        title = fm.get('标题', '') or fname.replace('.md', '')
+
+        candidates.append({
+            "filename": fname,
+            "title": title,
+            "coldness": coldness,
+            "age_days": age_days,
+            "status": status,
+            "has_backlink": has_backlink,
+            "word_count": word_count,
+            "reason": f"冷度 {coldness:.2f} | {status} | {age_days}天 | {'有回链' if has_backlink else '无回链'} | {word_count}字",
+        })
+
+        if age_days > stats["oldest_age_days"]:
+            stats["oldest_age_days"] = age_days
+
+    # 按冷度降序排列
+    candidates.sort(key=lambda x: -x["coldness"])
+    candidates = candidates[:max_results]
+    stats["candidates"] = len(candidates)
+
+    return {
+        "candidates": candidates,
+        "stats": stats,
+        "config": {
+            "stale_days": stale_days,
+            "max_results": max_results,
+            "mode": "raw_coldness",
+        },
+    }
