@@ -286,6 +286,154 @@ def collide(
     }
 
 
+def _extract_concepts(page: dict) -> list:
+    """从页面索引条目中提取概念标签。
+
+    支持两种格式：
+    - list: tags: ["概念A", "概念B"]（index.json 标准格式）
+    - str: tags: "概念A, 概念B"（frontmatter 原始格式）
+    """
+    tags_raw = page.get("tags", [])
+    if not tags_raw:
+        return []
+
+    # 如果已经是 list，直接用
+    if isinstance(tags_raw, list):
+        candidates = tags_raw
+    elif isinstance(tags_raw, str):
+        tags_str = tags_raw.strip()
+        if tags_str.startswith("[") and tags_str.endswith("]"):
+            tags_str = tags_str[1:-1]
+        candidates = [t.strip().strip("'").strip('"') for t in tags_str.split(",")]
+    else:
+        return []
+
+    # 过滤掉占位符和无意义标签
+    _skip = {"提炼", "概念", "方法", "工具", "认知", "AI", "系统", "日志", "写作", "哲学", "设计", "创作", "商业", "教育", "健康", "成长"}
+    return [c for c in candidates if c and c not in _skip]
+
+
+def _extract_all_concepts(pages: List[dict]) -> dict:
+    """从所有丹房页提取概念 → 页面映射。
+
+    Returns:
+        dict: {concept_name: {pages: [path, ...], domains: set, count: int}}
+    """
+    concept_map = {}
+    for p in pages:
+        path = p.get("path", "")
+        domain = p.get("domain", "未知")
+        concepts = _extract_concepts(p)
+        for c in concepts:
+            if c not in concept_map:
+                concept_map[c] = {"pages": [], "domains": set(), "count": 0}
+            concept_map[c]["pages"].append(path)
+            concept_map[c]["domains"].add(domain)
+            concept_map[c]["count"] += 1
+    return concept_map
+
+
+def concept_collide_pages(
+    vault_path: str,
+    pages: List[dict],
+    top_n: int = _TOP_N_DEFAULT,
+    min_sim: float = _MIN_SIM,
+    max_sim: float = _MAX_SIM,
+    min_pages: int = 2,
+) -> dict:
+    """概念级碰撞：基于标签字段做概念间的语义相似度匹配。
+
+    与页面级 collide() 的区别：
+    - 操作粒度：概念（标签）而非页面（summary）
+    - 输出：概念对 + 各自关联的页面
+    - 过滤：只碰撞至少出现在 min_pages 个页面中的概念
+
+    流程：
+    1. 从所有页面 frontmatter 提取标签
+    2. 过滤低频概念（< min_pages 页）
+    3. 对概念文本做嵌入
+    4. 跨域概念对余弦相似度匹配
+    5. 返回概念对 + 关联页面
+
+    Returns:
+        dict: {
+            "total_concepts": int,
+            "concepts_embedded": int,
+            "collisions": [{concept_a, concept_b, sim, pages_a, pages_b, domains_a, domains_b}, ...],
+            "concept_map": {concept: {pages, domains, count}},
+            "stats": {...}
+        }
+    """
+    model = _get_model()
+    if model is None:
+        return {"total_concepts": 0, "concepts_embedded": 0, "collisions": [], "concept_map": {}, "stats": {"error": "模型不可用"}}
+
+    # 1. 提取概念
+    concept_map = _extract_all_concepts(pages)
+    log.info(f"概念提取：{len(concept_map)} 个唯一概念")
+
+    # 2. 过滤低频概念
+    qualified = {c: info for c, info in concept_map.items() if info["count"] >= min_pages}
+    log.info(f"概念过滤（≥{min_pages}页）：{len(qualified)}/{len(concept_map)}")
+
+    if len(qualified) < 2:
+        return {"total_concepts": len(concept_map), "concepts_embedded": 0, "collisions": [], "concept_map": concept_map, "stats": {"error": "合格概念不足 2 个"}}
+
+    # 3. 嵌入概念文本
+    concept_names = list(qualified.keys())
+    vectors = model.encode(concept_names, show_progress_bar=False)
+    if vectors is None:
+        return {"total_concepts": len(concept_map), "concepts_embedded": 0, "collisions": [], "concept_map": concept_map, "stats": {"error": "嵌入失败"}}
+
+    # 4. 概念对碰撞
+    collisions = []
+    pairs_evaluated = 0
+    for i in range(len(concept_names)):
+        for j in range(i + 1, len(concept_names)):
+            ci = concept_names[i]
+            cj = concept_names[j]
+            info_i = qualified[ci]
+            info_j = qualified[cj]
+
+            # 跳过同域概念对（如果两个概念的所有页面都在同一域）
+            if info_i["domains"] == info_j["domains"] and len(info_i["domains"]) == 1:
+                continue
+
+            sim = _cosine_sim(vectors[i], vectors[j])
+            pairs_evaluated += 1
+            if min_sim <= sim <= max_sim:
+                collisions.append({
+                    "concept_a": ci,
+                    "concept_b": cj,
+                    "similarity": round(sim, 4),
+                    "pages_a": info_i["pages"],
+                    "pages_b": info_j["pages"],
+                    "domains_a": list(info_i["domains"]),
+                    "domains_b": list(info_j["domains"]),
+                    "count_a": info_i["count"],
+                    "count_b": info_j["count"],
+                    "reason": f"概念碰撞：{ci} × {cj}（相似度 {sim:.3f}，分别出现在 {info_i['count']}/{info_j['count']} 页）",
+                })
+
+    collisions.sort(key=lambda x: x["similarity"], reverse=True)
+    collisions = collisions[:top_n]
+
+    return {
+        "total_concepts": len(concept_map),
+        "concepts_embedded": len(qualified),
+        "pairs_evaluated": pairs_evaluated,
+        "collisions": collisions,
+        "concept_map": {c: {"pages": info["pages"], "domains": list(info["domains"]), "count": info["count"]} for c, info in qualified.items()},
+        "stats": {
+            "min_similarity": min_sim,
+            "max_similarity": max_sim,
+            "top_n": top_n,
+            "min_pages": min_pages,
+            "concepts_filtered": len(qualified),
+        },
+    }
+
+
 def _generate_reason(c: dict) -> str:
     """为碰撞对生成简短匹配理由。
 

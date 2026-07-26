@@ -1421,11 +1421,16 @@ class KnowledgeMixin:
         min_similarity: float = 0.6,
         max_similarity: float = 0.75,
         domain_filter: str = "",
+        mode: str = "page",
+        min_pages: int = 2,
     ) -> dict:
         """
         概念碰撞——跨域语义相似度检测，在 0.6-0.75 区间产出意外关联。
 
-        基于 bge-small-zh-v1.5 对丹房页做语义嵌入，只比较跨域对，
+        mode="page"（默认）：页面级碰撞，基于丹房页 summary 嵌入。
+        mode="concept"：概念级碰撞，基于 frontmatter 标签字段提取概念后嵌入。
+
+        基于 bge-small-zh-v1.5 做语义嵌入，只比较跨域对，
         筛选「有关联但视角不同」的语义巧合——低于 0.6 是噪音，高于 0.75 是重复。
         纯只读扫描，不写任何数据。由灵识逐条判断后执行补链或提炼。
 
@@ -1434,12 +1439,24 @@ class KnowledgeMixin:
             min_similarity: 最低相似度（默认 0.6）
             max_similarity: 最高相似度（默认 0.75）
             domain_filter: 限返回包含该域的碰撞对（可选）
+            mode: 碰撞模式，"page"（页面级）或 "concept"（概念级）
+            min_pages: 概念模式下，最低出现页数过滤（默认 2）
 
         Returns:
-            dict: 碰撞结果
+            dict: 碰撞结果。概念模式额外返回 concept_map
         """
         pages = self.memory.pages
         vault = self.vault_path
+
+        if mode == "concept":
+            return concept_collision.concept_collide_pages(
+                vault_path=vault,
+                pages=pages,
+                top_n=top_n,
+                min_sim=min_similarity,
+                max_sim=max_similarity,
+                min_pages=min_pages,
+            )
 
         return concept_collision.collide(
             vault_path=vault,
