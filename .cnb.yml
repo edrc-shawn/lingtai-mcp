@@ -1,6 +1,8 @@
 main:
   push:
-    - stages:
+    - imports:
+        - https://cnb.cool/edrc.shawn/lingtai-secrets/-/blob/main/gitee-secrets.yml
+      stages:
         - name: mirror to gitee
           script: |
             if [ -z "$GITEE_TOKEN" ]; then
