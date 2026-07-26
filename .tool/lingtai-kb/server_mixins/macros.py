@@ -610,7 +610,10 @@ class MacroMixin:
                 content=imprint_content,
                 tags=["协作者-工作印记", "session_end"],
                 branch="通用",
-                expiry_policy="session_scope",
+                # 修复根因：原 session_scope(0.9/天) 使工作印记约 1 天即被归档，
+                # 导致 grill-mode/贾维斯人设/RESOLVER 等真架构决策整批丢失。
+                # 改为 behavior_pattern(0.005/天) 长衰减，留足毕业管道沉淀窗口。
+                expiry_policy="behavior_pattern",
             )
             steps.append({
                 "step": "memory_write",
@@ -649,7 +652,35 @@ class MacroMixin:
         except Exception as e:
             steps.append({"step": "episodic_memory", "status": "skipped", "summary": f"L1 暂不可用: {str(e)[:60]}"})
 
-        # 步骤 6: image_evidence_scan（画像证据链追加）
+        # 步骤 6: concept_collide（跨域概念碰撞——收尾前主动发现意外关联）
+        try:
+            cc_result = self.concept_collide(mode="page", top_n=5, min_similarity=0.65, max_similarity=0.75)
+            collisions = cc_result.get("collisions", []) if isinstance(cc_result, dict) else []
+            dup_count = len(cc_result.get("duplicates", [])) if isinstance(cc_result, dict) else 0
+            if collisions:
+                top_hits = []
+                for c in collisions[:3]:
+                    top_hits.append(f"{c.get('domain_a','?')}×{c.get('domain_b','?')} ({c.get('similarity',0):.3f})")
+                steps.append({
+                    "step": "concept_collide",
+                    "status": "ok",
+                    "collisions": len(collisions),
+                    "top_hits": top_hits,
+                    "duplicates_found": dup_count,
+                    "summary": f"概念碰撞: {len(collisions)} 对跨域关联, Top: {', '.join(top_hits)}",
+                })
+            else:
+                steps.append({
+                    "step": "concept_collide",
+                    "status": "ok",
+                    "collisions": 0,
+                    "duplicates_found": dup_count,
+                    "summary": "概念碰撞: 无高价值跨域关联",
+                })
+        except Exception as e:
+            steps.append({"step": "concept_collide", "status": "skipped", "summary": f"概念碰撞暂不可用: {str(e)[:60]}"})
+
+        # 步骤 7: image_evidence_scan（画像证据链追加）
         if evidence_flags:
             try:
                 import json as _json

@@ -39,6 +39,15 @@ class DecayScheduler:
             if m.status not in ("active", "deprecated"):
                 continue
 
+            # 硬保护：用户纠正/指令/偏好/教训 永不归档，防止高价值记忆被误伤。
+            # 背景：user_correction/user_directive 若配错策略仍会丢；lesson 仅享 0.5× 减速
+            # 仍可能在连续低置信周期被归档（如 mem_1d36a1c2f115 已归档的测试教训）。
+            # 这类记忆应走「毕业管道」沉淀进丹房，而非被衰减丢弃。
+            PROTECTED_SOURCES = {"user_correction", "user_directive"}
+            PROTECTED_TAGS = {"lesson", "preference", "user_correction", "user_directive"}
+            if m.source in PROTECTED_SOURCES or (set(m.tags or []) & PROTECTED_TAGS):
+                continue  # 跳过衰减，永不变更状态/置信度
+
             # 解析衰减策略：expiry_policy 合法则用，否则按 memory_type 映射
             policy_key = resolve_decay_policy(m.memory_type, m.expiry_policy)
             daily_decay = DECAY_POLICIES[policy_key]["daily_decay"]
