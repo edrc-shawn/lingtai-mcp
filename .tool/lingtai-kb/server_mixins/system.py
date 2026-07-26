@@ -14,6 +14,20 @@ import urllib.error
 from decorators import tool
 from logger import get_logger
 
+
+def _get_depth_suggestion(depth_score: float, strong: int, weak: int, weak_pages: list) -> str:
+    """根据论证深度检测结果生成建议。"""
+    if depth_score >= 0.6:
+        return f"论证深度良好：{strong} 页达到深度论证。{weak} 页偏浅，可补强。"
+    elif depth_score >= 0.3:
+        tips = []
+        if weak_pages:
+            tips.append(f"优先补强: {weak_pages[0]['path']}")
+        tips.append("建议为浅层页添加「补角」段落或局限分析")
+        return f"论证深度中等：{depth_score:.0%} 页达标。{'；'.join(tips)}"
+    else:
+        return f"论证深度偏低：仅 {depth_score:.0%} 页达标。建议从 {weak_pages[0]['path'] if weak_pages else '最早页面'} 起步补强。"
+
 log = get_logger(__name__)
 
 class SystemMixin:
@@ -740,17 +754,153 @@ class SystemMixin:
             "latency_ms": elapsed,
         }
 
+    def _check_argument_depth(self) -> dict:
+        """论证深度检查——扫描丹房页的多角度论证指标，对齐规则 20。
+
+        检测维度：
+        1. 多视角结构：≥2 个 ## 子标题（不同角度展开）
+        2. 局限/冲突标记：包含「局限」「冲突」「矛盾」「反驳」等自省段落
+        3. 补角模式：包含「补角」标记（灵台特有增量论证模式）
+        4. 对比表格：包含 | 表格结构（多维度对比）
+        5. 警告框：包含 [!warning] 或 [!conflict] 标注
+
+        Returns:
+            dict: {depth_score, total_pages, passed, failed, details, stats}
+        """
+        import re, os
+        from datetime import datetime
+
+        vault = getattr(self, 'vault_path', None) or r"."
+        danfang_dir = os.path.join(vault, "丹房")
+        if not os.path.isdir(danfang_dir):
+            return {"error": "丹房目录不存在", "depth_score": 0}
+
+        # 收集所有丹房页
+        pages = []
+        for root, dirs, files in os.walk(danfang_dir):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for f in files:
+                if f.endswith('.md'):
+                    pages.append(os.path.join(root, f))
+
+        if not pages:
+            return {"error": "丹房无页面", "depth_score": 0}
+
+        # 抽样策略：按品级分层，每层最多 30 页
+        pinji_samples = {"上品": [], "中品": [], "下品": [], "": []}
+        for p in pages:
+            try:
+                with open(p, 'r', encoding='utf-8-sig') as fp:
+                    head = ''.join(fp.readline() for _ in range(8))
+            except Exception:
+                continue
+            pm = re.search(r'品级:\s*(\S+)', head)
+            level = pm.group(1) if pm else ""
+            if len(pinji_samples.get(level, [])) < 30:
+                pinji_samples.setdefault(level, []).append(p)
+
+        sampled = []
+        for level_pages in pinji_samples.values():
+            sampled.extend(level_pages)
+
+        # 指标检测
+        stats = {"total_sampled": len(sampled), "multi_section": 0, "has_limitation": 0,
+                 "has_bujiao": 0, "has_table": 0, "has_warning": 0}
+        details = []
+
+        SECTION_RE = re.compile(r'^##\s+', re.MULTILINE)
+        LIMIT_RE = re.compile(r'(局限|冲突|矛盾|反驳|争议|不足|缺陷|短板|反面)')
+        BUJIAO_RE = re.compile(r'补角')
+        TABLE_RE = re.compile(r'\|.*\|.*\|')
+        WARNING_RE = re.compile(r'\[!warning\]|\[!conflict\]|\[!矛盾\]')
+
+        for path in sampled:
+            try:
+                with open(path, 'r', encoding='utf-8-sig') as fp:
+                    content = fp.read()
+            except Exception:
+                continue
+
+            h2_count = len(SECTION_RE.findall(content))
+            has_lim = bool(LIMIT_RE.search(content))
+            has_bj = bool(BUJIAO_RE.search(content))
+            has_tb = bool(TABLE_RE.search(content))
+            has_warn = bool(WARNING_RE.search(content))
+
+            if h2_count >= 2:
+                stats["multi_section"] += 1
+            if has_lim:
+                stats["has_limitation"] += 1
+            if has_bj:
+                stats["has_bujiao"] += 1
+            if has_tb:
+                stats["has_table"] += 1
+            if has_warn:
+                stats["has_warning"] += 1
+
+            # 综合评分：每个维度 1 分，满分 5
+            score = sum([1 if h2_count >= 2 else 0, 1 if has_lim else 0,
+                         1 if has_bj else 0, 1 if has_tb else 0, 1 if has_warn else 0])
+
+            detail = {
+                "path": os.path.relpath(path, vault).replace('\\', '/'),
+                "h2_count": h2_count,
+                "has_limitation": has_lim,
+                "has_bujiao": has_bj,
+                "has_table": has_tb,
+                "has_warning": has_warn,
+                "depth_score": score,
+            }
+            details.append(detail)
+
+        # 分级统计
+        strong = sum(1 for d in details if d["depth_score"] >= 3)  # ≥3 分 = 深度论证
+        moderate = sum(1 for d in details if d["depth_score"] == 2)  # 2 分 = 中度
+        weak = sum(1 for d in details if d["depth_score"] <= 1)  # ≤1 分 = 浅层
+
+        depth_score = round(strong / len(details), 2) if details else 0.0
+
+        # 找出最弱页面（≤1 分且非日志/索引页）
+        weak_pages = [d for d in details if d["depth_score"] <= 1
+                      and "日志" not in d["path"] and "索引" not in d["path"] and "README" not in d["path"]]
+        weak_pages.sort(key=lambda x: x["depth_score"])
+
+        return {
+            "depth_score": depth_score,
+            "depth_score_label": f"{depth_score:.0%} 页达到深度论证（≥3/5 维度）",
+            "total_sampled": stats["total_sampled"],
+            "strong": strong,
+            "moderate": moderate,
+            "weak": weak,
+            "stats": stats,
+            "weak_pages": [w["path"] for w in weak_pages[:10]],
+            "suggestion": _get_depth_suggestion(depth_score, strong, weak, weak_pages[:5]),
+            "check_time": datetime.now().isoformat(timespec="seconds"),
+        }
+
+    @tool(readonly=True, write=False, category="health", system=False, name="argument_depth_check")
+    def argument_depth_check_tool(self) -> dict:
+        """论证深度检查——扫描丹房页的多角度论证指标，对齐规则 20。
+        
+        检测 5 个维度：多视角结构、局限/冲突标记、补角模式、对比表格、警告框。
+        返回深度评分 + 弱页面列表 + 改进建议。
+        """
+        return self._check_argument_depth()
+
     @tool(readonly=True, write=False, category="health", system=False, name="knowledge_quality_check")
     def quality_check_tool(self, mode: str = "quick") -> dict:
         """
         检索质量基准检测——用标准查询集验证知识库检索是否退化
 
         Args:
-            mode: "quick"（5 组核心查询）| "full"（全部 10 组）
+            mode: "quick"（5 组核心查询）| "full"（全部 10 组）| "depth"（论证深度检查，对齐规则 20）
 
         Returns:
-            dict: {score, passed, failed, details, trend}
+            dict: {score, passed, failed, details, trend}（depth 模式返回 depth_score 和 depth_details）
         """
+        if mode == "depth":
+            return self._check_argument_depth()
+
         import json, os
         queries_path = os.path.join(os.path.dirname(__file__), '..', 'benchmark_queries.json')
         if not os.path.exists(queries_path):
