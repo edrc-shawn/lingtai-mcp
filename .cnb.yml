@@ -1,0 +1,7 @@
+main:
+  push:
+    - stages:
+        - name: mirror to gitee
+          script: |
+            git remote add gitee https://erdong-risheng:${GITEE_TOKEN}@gitee.com/erdong-risheng/lingtai-mcp.git
+            git push gitee main --force
