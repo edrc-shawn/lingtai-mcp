@@ -3,5 +3,9 @@ main:
     - stages:
         - name: mirror to gitee
           script: |
+            if [ -z "$GITEE_TOKEN" ]; then
+              echo "⚠️ GITEE_TOKEN not set, skipping mirror"
+              exit 0
+            fi
             git remote add gitee https://erdong-risheng:${GITEE_TOKEN}@gitee.com/erdong-risheng/lingtai-mcp.git
             git push gitee main --force
