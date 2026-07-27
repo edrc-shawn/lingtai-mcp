@@ -7,6 +7,7 @@
 与旧 mcp_server.py 完全兼容——所有工具名和接口签名不变。
 """
 import os, sys, json, time, threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from pathlib import Path
 
 # 添加当前目录到路径
@@ -102,15 +103,10 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
         except Exception:
             self._raw_index_warmup_thread = None
 
-        # 异步预热语义检索模型 + 预缓存全部记忆 embedding：
-        # 后台线程提前加载 bge-small-zh-v1.5，不阻塞启动。
-        # lingshi_inject/memory_search 首次调用时检查就绪状态，
-        # 未就绪则跳过语义搜索，使用纯关键词模式。
+        # 语义检索模型：sentence_transformers 未安装，不再预加载。
+        # lingshi_inject/memory_search 首次调用时按需加载，
+        # 加载失败则跳过语义搜索，使用纯关键词模式。
         self._semantic_model_ready = False
-        try:
-            threading.Thread(target=self._warmup_semantic_model, daemon=True).start()
-        except Exception:
-            log.debug("suppressed", exc_info=True)
 
     # ═══ 惰性加载属性 ═══
     @property
@@ -137,22 +133,6 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
             self.client = str(name)
         if version:
             self.client_version = str(version)
-
-    def _warmup_semantic_model(self):
-        """异步预热语义检索模型 + 预缓存全部记忆 embedding。
-        完成后设置 _semantic_model_ready = True。"""
-        try:
-            from memory_bank.semantic_retriever import preload_model, ensure_cached
-            loaded = preload_model()
-            if loaded:
-                # 预缓存全部活跃记忆 embedding，避免首次 lingshi_inject on-the-fly 计算
-                all_active = self.memory_bank.query(keyword="", status="active", min_confidence=0.0)
-                if all_active:
-                    ensure_cached(all_active)
-            self._semantic_model_ready = True
-        except Exception as e:
-            log.warning("warmup semantic model error", extra={"error": str(e)})
-            self._semantic_model_ready = False
 
     def _detect_cross_end(self) -> dict:
         """轻量跨端活动检测：从 tool_sessions.jsonl 取调用次数+时间 +
@@ -315,7 +295,19 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
         # 全量计算（首次冷启动 / 源已变更 / 带能力重算）
         log.info("lazy-loading context (first tool call)")
         try:
-            raw = self.context(client_capabilities=client_capabilities)
+            # 超时保护：context() 首次全量计算可能耗时过长（I/O 密集），
+            # 用 15s 超时防 MCP 客户端断连。超时后返回降级上下文。
+            raw = None
+            timeout_error = None
+            with ThreadPoolExecutor(max_workers=1) as _executor:
+                _future = _executor.submit(self.context, client_capabilities=client_capabilities)
+                try:
+                    raw = _future.result(timeout=15)
+                except FutureTimeoutError as e:
+                    timeout_error = e
+                    log.warning("context() timed out after 15s, using degraded fallback")
+            if raw is None:
+                raise timeout_error or RuntimeError("context() returned None")
             # 注入降级模式标记
             mode = check_mode(self.vault_path)
             if "layers" in raw:
@@ -533,16 +525,14 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "context_cache.json")
 
     def _context_cache_stamp(self) -> float:
-        """失效键：context 依赖的关键源文件最大 mtime。任一源变更 → 缓存失效重算。"""
+        """失效键：context 依赖的核心源文件最大 mtime。
+        只检查 index.json（知识库结构）和 memories.json（记忆数据），
+        画像/约束集/MEMORY.md 变更频率极低或与 context 结构无关，不再触发失效。
+        任一核心源变更 → 暖启动缓存失效，走全量重算。"""
         vault = self.vault_path
         sources = [
             os.path.join(vault, "丹房", ".meta", "index.json"),
-            os.path.join(vault, "画像", "履历.md"),
-            os.path.join(vault, "画像", "心性.md"),
-            os.path.join(vault, "画像", "我是谁.md"),
             os.path.join(vault, ".tool", "lingtai-kb", "memory_bank", "data", "memories.json"),
-            os.path.join(vault, "丹房", "00-思考与认知", "协作者约束集.md"),
-            os.path.join(vault, ".workbuddy", "memory", "MEMORY.md"),
         ]
         stamps = []
         for s in sources:

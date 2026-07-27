@@ -318,6 +318,11 @@ def _mw_execute(state):
     name = state["tool_name"]
     handler = _TOOL_MAP.get(name)
     if not handler:
+        # 工具不存在：记录为 unknown_tool 而非 error，消除假阳性断连信号
+        try:
+            get_session_logger().record_call(name, 0, client=getattr(server, "client", "unknown"), outcome="unknown_tool")
+        except Exception:
+            pass
         return {
             "jsonrpc": "2.0",
             "id": state["req_id"],

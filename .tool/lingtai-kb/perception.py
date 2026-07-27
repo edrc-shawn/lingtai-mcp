@@ -509,11 +509,11 @@ class PerceptionTools:
             "domains": stats["by_domain"],
         }
         
-        # 2. 待办概要（来自 hook-session-greeting）— 带 TTL 缓存（30s）
+        # 2. 待办概要（来自 hook-session-greeting）— 带 TTL 缓存（300s）
         # 避免每次 context_load 都扫描 1264 原料文件
         pending_count = getattr(self, '_pending_count_cached', None)
         pending_ts = getattr(self, '_pending_cache_ts', 0)
-        if pending_count is None or (time.time() - pending_ts) > 30:
+        if pending_count is None or (time.time() - pending_ts) > 300:
             pending_dir = Path(self.vault_path) / "原料"
             pending_count = 0
             if pending_dir.exists():
