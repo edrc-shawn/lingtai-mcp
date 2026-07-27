@@ -1177,9 +1177,9 @@ class PerceptionMixin:
         for kw in ("记忆", "之前", "上次", "还记得", "发生过", "教训", "经历", "前几次", "有过什么", "记不记得", "回忆", "纠正过", "我说过"):
             if kw in q:
                 return {
-                    "category": "记忆/教训", "recommended_tool": "lingshi_inject",
+                    "category": "记忆/教训", "recommended_tool": "context_load",
                     "alternative": "memory_search", "confidence": 0.80,
-                    "reason": "走灵识记忆银行。lingshi_inject 统一注入四层记忆，memory_search 可按关键词检索。",
+                    "reason": "走灵识记忆银行。context_load 统一注入四层记忆+画像+约束集，memory_search 可按关键词检索。",
                 }
 
         # 操作/历史类

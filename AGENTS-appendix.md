@@ -21,7 +21,7 @@
 | `fulltext_search` | 规则⑤ | 免费 | 补盲搜索（技能/原料/作品/日志/all）M9: 吸收 system_search_logs | 🏛️ LLM Wiki |
 | `context_load` | 规则④ | 免费 | **会话启动必调**。返回画像三层+教训+约束集+工作印记 | 🏛️ LLM Wiki |
 | `lingshi_classify` | 规则① | 免费 | 问题分类路由 — 不确定分类时调此工具自动分流 | 🧠 灵识 |
-| `lingshi_inject` | 记忆/教训 | 免费 | 灵识4层统一注入（记忆/教训/习惯类问题用） | 🧠 灵识 |
+| `lingshi_inject`（已废弃→`context_load`） | 记忆/教训 | 免费 | 灵识4层统一注入（记忆/教训/习惯类问题用，已由 `context_load` 替代） | 🧠 灵识 |
 | `user_push` | 规则⑦ | 免费 | 推偏好/习惯到画像 | 🧠 灵识 |
 | `memory_write` | 规则⑧⑪ | 免费 | 写入经验记忆。用于教训/偏好/可泛化行为 | 🧠 灵识 |
 | `memory_search` | 规则⑧ | 免费 | 搜索记忆银行（支持 branch 过滤 + 语义检索）| 🧠 灵识 |
@@ -60,7 +60,7 @@
 | 知识库概览 | `knowledge_overview` | 替代 knowledge_stats/domains/pages（M1 合并） |
 | 知识合成（必用） | `knowledge_synthesize` | **分析类问题第一步必调**。返回合成正文+差距标注+**问题前置澄清**（自动检测歧义/多义/隐含假设）+**延伸方向建议**（suggested_next: page/tool 推荐，借鉴 dbskill Skill 路由） |
 | 观察总览 | `observation_dashboard` | 替代 observation_stats/rule_health（M7 合并） |
-| 记忆类问题（必用） | `lingshi_inject` | **每会话必调**。替代手写 `memory_search`+人工筛选 |
+| 记忆类问题（必用） | `context_load` | **每会话必调**。替代手写 `lingshi_inject` + 人工筛选 |
 | 记忆健康检查 | `memory_stats` + `memory_consolidate` | 每周查一次：活跃数/pending数/毕业率/平均置信度 |
 | 跨会话存档（必用） | `memory_snapshot` + `memory_restore` | **每会话收尾前必调**。把关键结论/已否决方向/待解问题存快照，下次 `memory_restore` 接续 |
 | 发现热门/冷门页 | `knowledge_heatmap` | 每周查时可跑一次，指导补什么 |
@@ -107,7 +107,7 @@
 |---------|--------|---------|------|
 | 画像/身份类 | "我是谁""我是什么样的人""我的特征" | `context_load`（已内置画像三层） | 画像数据存 `画像/` 目录，不在丹房页，inject 搜不到 |
 | 知识/概念类 | "什么是X""解释Y""X与Y有什么关系" | `knowledge_inject`（或 `knowledge_recall` 宏） | 丹房知识页，主场景 |
-| 记忆/教训类 | "之前发生了什么""上次怎么做的" | `lingshi_inject` / `memory_search` | 灵识记忆银行 |
+| 记忆/教训类 | "之前发生了什么""上次怎么做的" | `context_load` / `memory_search` | 灵识记忆银行 |
 | 操作/历史类 | "什么时候改的""怎么改的" | `knowledge_search`（日志自动追加） | 日志/体检记录 |
 
 **不确定分类时**：优先调 `lingshi_classify(question)` 工具自动分流——返回 `{category, recommended_tool, confidence, reason}`，AI 直接按推荐调对应工具。
@@ -376,7 +376,7 @@ knowledge_search(keyword)
 | 层 | 是什么 | 在哪里 |
 |----|-------|--------|
 | **灵识** | WorkBuddy 对话侧的意识层 — 由 AGENTS.md 约束集 + SOUL.md 人格 + context_load 注入的画像/教训/记忆共同构成 | WorkBuddy 对话上下文 |
-| **PerceptionMixin** | 灵识在灵台 MCP 侧的工具接口 — 提供 lingshi_inject/lingshi_classify/memory_* 等工具 | `.tool/lingtai-kb/server_mixins/perception.py` |
+| **PerceptionMixin** | 灵识在灵台 MCP 侧的工具接口 — 提供 lingshi_classify/memory_* 等工具（`lingshi_inject` 已废弃，由 `context_load` 替代） | `.tool/lingtai-kb/server_mixins/perception.py` |
 | **灵台 MCP** | 工具层 — 知识系统、记忆银行、画像层、观察层 的底层实现 | `.tool/lingtai-kb/` |
 
 灵识有两种工作模式：
