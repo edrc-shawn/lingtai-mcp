@@ -22,7 +22,7 @@ TOOL_TO_METHOD = {
     "knowledge_inject": "inject", "raw_save": "save",
     "knowledge_gaps": "gaps", "knowledge_digest": "digest",
     "ingest_ripple": "ingest_ripple", "context_load": "ensure_context",
-    "cross_end_activity": "cross_end_activity", "lingshi_inject": "lingshi_inject",
+    "cross_end_activity": "cross_end_activity",
     "memory_write": "mem_write", "memory_search": "mem_query",
     "memory_stats": "mem_stats", "memory_consolidate": "mem_consolidate",
     "memory_feedback": "mem_feedback", "memory_merge": "mem_merge",
@@ -52,12 +52,11 @@ TOOL_TO_METHOD = {
     "system_registry_scan": "registry_scan", "vector_index_status": "vector_index_status",
     "domain_visibility": "domain_visibility",
     "health_inspect": "health_inspect", "health_ledger": "health_ledger",
-    "episodic_recent": "episodic_recent", "episodic_search": "episodic_search",
+    "episodic_search": "episodic_search",
     "knowledge_recall": "knowledge_recall", "session_end": "session_end",
     "auto_evolve": "auto_evolve", "topic_match": "topic_match",
     "get_macro_stats": "get_macro_stats",
     "output_list": "output_list", "output_publish": "output_publish",
-    "skill_list": "skill_list",
     "agent_recommend": "agent_recommend", "agent_feedback": "agent_feedback",
     "agent_skills": "agent_skills",
     "skillopt_dryrun": "skillopt_dryrun", "skillopt_run": "skillopt_run",
@@ -77,10 +76,9 @@ for tn in TOOL_TO_METHOD:
     elif tn.startswith("raw_"): TOOL_CATEGORY[tn] = "raw"
     elif tn.startswith("memory_"): TOOL_CATEGORY[tn] = "memory"
     elif tn.startswith("observation_"): TOOL_CATEGORY[tn] = "observation"
-    elif tn.startswith("lingshi_"): TOOL_CATEGORY[tn] = "lingshi"
     elif tn.startswith("user_"): TOOL_CATEGORY[tn] = "user"
     elif tn.startswith("health_"): TOOL_CATEGORY[tn] = "health"
-    elif tn.startswith("system_") or tn.startswith("sys_") or tn in ("context_load", "cross_end_activity", "fulltext_search", "web_search", "episodic_recent", "episodic_search"): TOOL_CATEGORY[tn] = "system"
+    elif tn.startswith("system_") or tn.startswith("sys_") or tn in ("context_load", "cross_end_activity", "fulltext_search", "web_search", "episodic_search"): TOOL_CATEGORY[tn] = "system"
     elif tn in ("knowledge_recall", "session_end", "refine_quick", "auto_evolve", "topic_match", "get_macro_stats"): TOOL_CATEGORY[tn] = "macro"
     elif tn.startswith("skillopt_"): TOOL_CATEGORY[tn] = "pipeline"
     elif tn.startswith("output_"): TOOL_CATEGORY[tn] = "output"
@@ -117,9 +115,9 @@ READONLY_TOOLS = {
     "raw_derive", "raw_derive_batch",
     "user_push", "user_feedback",
     "system_sop", "system_search_logs", "fulltext_search", "web_search",
-    "health_inspect", "system_health", "episodic_recent", "episodic_search",
+    "health_inspect", "system_health", "episodic_search",
     "knowledge_recall", "topic_match",
-    "output_list", "skill_list", "agent_recommend", "agent_skills",
+    "output_list", "agent_recommend", "agent_skills",
     "skillopt_dryrun", "skillopt_status", "skillopt_log",
     "vector_index_status", "domain_visibility",
     "knowledge_overview", "observation_dashboard",

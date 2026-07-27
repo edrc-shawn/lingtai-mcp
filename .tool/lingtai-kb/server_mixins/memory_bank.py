@@ -86,7 +86,7 @@ class MemoryBankMixin:
                    semantic: bool = True, consumer: str = "", top_k: int = 20) -> dict:
         """检索记忆银行中的教训/偏好/纠正/决策记录。
         场景：找"之前发生过什么""用户纠正过什么""上次怎么决定的""我的偏好是什么"时。
-        区别：找知识概念用 knowledge_search；找会话级交互日志用 episodic_search；一次性注入全部记忆层用 lingshi_inject。
+        区别：找知识概念用 knowledge_search；找会话级交互日志用 episodic_search；获取完整会话上下文用 context_load。
 
         include_pending=True（默认）→ 查全部（含 pending+active）
         include_pending=False → 仅查 active 记忆（原 MCP 默认行为）

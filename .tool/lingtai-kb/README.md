@@ -135,7 +135,6 @@ result = tools.inject("关键词")
 
 | 工具 | 说明 |
 |------|------|
-| `lingshi_inject` | 注入 4 层记忆摘要 |
 | `memory_write` | 写入经验记忆 |
 | `memory_search` | 搜索记忆银行 |
 | `memory_consolidate` | 记忆→知识毕业建议 |

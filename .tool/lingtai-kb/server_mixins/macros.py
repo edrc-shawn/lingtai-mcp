@@ -979,14 +979,6 @@ class MacroMixin:
             "results": results,
         }
 
-    # ─── ingest_ripple_apply: 波及分析+批量应用宏 ───
-
-    # [已废弃 2026-07-19] ingest_ripple_apply 替 AI 决策波及页，违反"放大器非替代品"原则
-    # 改用：ingest_ripple(预览) → AI 逐条审查 → page_append_section(写入)
-    def ingest_ripple_apply(self, new_page: str, max_results: int = 10, max_apply: int = 5) -> dict:
-        return {"error": "ingest_ripple_apply 已废弃，请用 ingest_ripple 预览后手动 page_append_section"}
-
-
     # ─── 宏使用率查询 ───
 
     @tool(readonly=False, write=True, category="macro", system=True)
@@ -1010,13 +1002,6 @@ class MacroMixin:
         """生成幂等宏调用 ID"""
         raw = f"{prefix}:{seed}:{time.time()}"
         return f"{prefix}_{hashlib.md5(raw.encode()).hexdigest()[:8]}"
-
-    # ─── memory_graduate: 一键毕业（consolidate → link）───
-
-    # [已废弃 2026-07-19] memory_graduate 替 AI 决策毕业候选，违反"放大器非替代品"原则
-    # 改用：memory_consolidate(预览) → AI 逐条审查 → memory_link(写入)
-    def memory_graduate(self, min_confidence: float = 0.7, max_results: int = 5) -> dict:
-        return {"error": "memory_graduate 已废弃，请用 memory_consolidate 预览后手动 memory_link"}
 
     # ─── auto_evolve: 知识自动演化（扫描→建联→产出刷新候选）───
 

@@ -76,7 +76,7 @@ class PerceptionStats:
                 "rule3_recommend": {"triggered": 0, "recommended": 0},
                 "rule4_context": {"generated": 0},
                 "rule5_search": {"triggered": 0, "completed": 0},
-                "lingshi_inject": {"triggered": 0, "found": 0, "used": 0},
+                
             },
             "daily": {},
             "updated_at": datetime.now().isoformat(),
@@ -226,21 +226,6 @@ class PerceptionStats:
         
         self._save_stats()
     
-    def record_lingshi_inject(self, found: bool, used: bool = False):
-        """
-        记录灵识注入调用
-        
-        Args:
-            found: 是否找到匹配的灵识记忆
-            used: AI 是否在回复中使用了注入内容
-        """
-        self.stats["rules"]["lingshi_inject"]["triggered"] += 1
-        if found:
-            self.stats["rules"]["lingshi_inject"]["found"] += 1
-        if used:
-            self.stats["rules"]["lingshi_inject"]["used"] += 1
-        self._save_stats()
-    
     def get_hit_rates(self) -> dict:
         """
         获取各规则的命中率
@@ -294,11 +279,7 @@ class PerceptionStats:
                 "completed": r5_completed,
                 "rate": round(r5_rate, 1),
             },
-            "lingshi_inject": {
-                "triggered": rules["lingshi_inject"]["triggered"],
-                "found": rules["lingshi_inject"]["found"],
-                "used": rules["lingshi_inject"]["used"],
-            },
+            
         }
     
     def get_daily_stats(self, days: int = 7) -> list:

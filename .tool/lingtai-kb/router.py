@@ -117,13 +117,11 @@ _TOOL_MAP["page_append_section"] = lambda a: (
 
 # 宏工具：需要 _wrap 但不需要 write_lock（内部自行管理锁）
 _MACRO_TOOLS = {
-    "ingest_ripple_apply",
     "knowledge_recall",
     "session_end",
     "refine_quick",
     "get_macro_stats",
     "system_health",
-    "episodic_recent",
     "episodic_search",
 }
 for _mt in _MACRO_TOOLS:

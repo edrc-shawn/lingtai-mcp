@@ -1312,14 +1312,6 @@ class SystemMixin:
 
     # ─── 技能路由 ───
 
-    @tool(readonly=True, write=False, category="general", system=True)
-    def skill_list(self) -> dict:
-        """[已合并到 agent_skills] 列出所有可用技能模板"""
-        from skill_router import SkillRouter
-        router = SkillRouter(self.vault_path)
-        skills = router.list_skills()
-        return {"total": len(skills), "skills": skills}
-
     @tool(readonly=True, write=False, category="general", system=False, name="detect_memory_signal")
     def detect_memory_signal(self, text: str) -> dict:
         """
@@ -1520,19 +1512,6 @@ class SystemMixin:
             return compute_indicators(vault)
         except Exception as e:
             return {"error": str(e), "ingestion_backlog": 0, "tool_health": {}, "last_session_gap_days": 0}
-
-    @tool(readonly=True, write=False, category="system", system=True)
-    def episodic_recent(self, days: int = 7, limit: int = 10) -> dict:
-        """[已合并到 episodic_search] 查看最近N天的会话交互摘要。"""
-        try:
-            from memory_bank.episodic import EpisodicMemory
-            vault = getattr(self, 'vault_path', None) or r"."
-            ep = EpisodicMemory(vault)
-            results = ep.get_recent(days=days, limit=limit)
-            follow_ups = ep.get_follow_ups()
-            return {"found": len(results) > 0, "total": len(results), "sessions": results, "follow_ups": follow_ups}
-        except Exception as e:
-            return {"found": False, "error": str(e), "sessions": []}
 
     @tool(readonly=True, write=False, category="system", system=False)
     def episodic_search(self, keyword: str = None, limit: int = 10, days: int = None) -> dict:

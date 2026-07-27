@@ -104,7 +104,7 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
             self._raw_index_warmup_thread = None
 
         # 语义检索模型：sentence_transformers 未安装，不再预加载。
-        # lingshi_inject/memory_search 首次调用时按需加载，
+        # memory_search 首次调用时按需加载，
         # 加载失败则跳过语义搜索，使用纯关键词模式。
         self._semantic_model_ready = False
 
@@ -203,6 +203,7 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
         for cli, info in others.items():
             info["alert"] = f"{cli} 最近有 {info['sessions']} 次工具调用，最后活动于 {info['last_active'][:16]}"
         return others
+    @tool(readonly=True, write=False, category="system", system=False, name="context_load")
     def ensure_context(self, client_capabilities=None, detail="detailed", client_id=None, operator=None, ambient=False) -> dict:
         """懒加载上下文——首次调任何感知工具时静默触发，结果缓存供 context_load 快速返回。
         client_capabilities: 可选能力清单（握手声明），传入时强制重算以纳入能力集。

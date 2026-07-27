@@ -159,10 +159,9 @@ fulltext_search:
 | `knowledge_gaps` | 知识缺口 | 不变 |
 | `knowledge_heatmap` | 热度图 | 🟢 暴露 |
 
-### 🧩 灵识注入（3）
+### 🧩 用户画像（2）
 | 工具 | 说明 | 变更 |
 |------|------|------|
-| `lingshi_inject` | 4层记忆注入 | 不变 |
 | `user_push` | 推送偏好 | 🟢 暴露 |
 | `user_feedback` | 纠正反馈 | 🟢 暴露 |
 
@@ -295,7 +294,7 @@ def handle_request(request):
 |--------|------|------|
 | `server_mixins/page_manager.py` | create_page/update_page/append_section/read_page/add_link/link_suggest | ~600 |
 | `server_mixins/refine.py` | refine_mark/refine_status/_refine_map_* | ~400 |
-| `server_mixins/perception.py` | inject/save/lingshi_inject | ~500 |
+| `server_mixins/perception.py` | inject/save | ~500 |
 
 ---
 
