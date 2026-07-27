@@ -129,7 +129,7 @@
 4. **波及检查**（Karpathy Ingest 原则，仅"提炼/新建丹房页"时）→ 调 `ingest_ripple` 预览，逐条审查后 `page_append_section` 批量补引用，目标触及 **8-15 页**，完成后再提 Git。**全跳过（applied_count=0）时不得略过**——手动补链：读新页定域 → 列同域枢纽/热页 → 追加 2-3 条 `[[新页]]` 引用。详见 `AGENTS-appendix.md#5.4`
 5. **文档对齐** → 改了代码/流程后检查 AGENTS.md/README/丹房页是否需同步
 6. **MCP 刷新** → 改了 `.tool/lingtai-kb/` 代码后调 `sys_reload`（不可用则下次重启生效）
-7. **教训归档** → 有教训则 `mem_write(tags=["lesson"])`。按信源分流：AI 自省的行为规范 → `type:behavior` **直接写高置信**；用户教的偏好/事实 → `type:knowledge` **保持 pending 待确认**。详见 `AGENTS-appendix.md#教训生命周期`
+7. **教训归档** → 有教训则 `mem_write(tags=["lesson"])`。按信源分级映射初始置信度（`SOURCE_LEVELS` 表）：AI 自省（`mcp`/`ai_reasoning`，0.5）仍需 1 次 adopt 转正，不直接 active；用户纠正（`user_correction`，0.9）直接 active。详见 `AGENTS-appendix.md#教训生命周期`
 8. **记忆毕业检查** → 调 `memory_consolidate(min_confidence=0.7)` 查候选，确认后 `memory_link` 毕业；超期（>7天）必处理。**判据一句话**："下一个接手的人需要知道吗？"需要 → 属丹房不属记忆（反复≥3次/讲系统怎么工作/事件记录 → 一律毕业）
 9. **跨会话存档** → 有实质性产出时调 `memory_snapshot` 存关键结论/已否决方向/待解问题，供下次会话 `memory_restore` 接续。借鉴 dbskill save/restore 机制
 10. **灵识批量处理** → **必调** `session_end(session_start="2026-07-20T15:35")` 宏（一步完成 user_feedback+user_push+knowledge_save+memory_write+工作印记，带时间范围）。不调 = 画像和记忆不更新

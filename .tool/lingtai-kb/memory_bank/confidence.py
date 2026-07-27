@@ -19,6 +19,7 @@ SOURCE_LEVELS = {
     "user_directive":  {"confidence": 0.8, "label": "用户明确指令", "description": "用户直接说'存这个'"},
     "user_repeated":    {"confidence": 0.8, "label": "用户重复行为", "description": "同一行为出现3次以上"},
     "ai_reasoning":     {"confidence": 0.5, "label": "AI推理结论", "description": "需要后续验证"},
+    "mcp":              {"confidence": 0.5, "label": "MCP工具自省", "description": "AI 调试中实测验证的行为规范，与 ai_reasoning 同级；仍需 1 次 adopt 到 0.6 门槛转 active"},
     "user_stated":      {"confidence": 0.4, "label": "单次用户陈述", "description": "可能是一时兴起"},
     "hebbian":          {"confidence": 0.2, "label": "共现权重自增", "description": "Hebbian自动涨，可能巧合"},
     "external":         {"confidence": 0.1, "label": "外部数据摄入", "description": "原料未消化"},
