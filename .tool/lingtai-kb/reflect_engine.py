@@ -45,13 +45,19 @@ class ReflectEngine:
     
     def __init__(self, vault_path: str = None):
         if vault_path is None:
-            self.vault_path = r"."
+            # 优先环境变量，避免调用方 cwd 不在 vault 根时产生假零结果
+            self.vault_path = os.environ.get("LINGTAI_VAULT", r".")
         else:
             self.vault_path = vault_path
         
         self.丹房 = Path(self.vault_path) / "丹房"
         self.原料 = Path(self.vault_path) / "原料"
         self.report_path = Path(self.vault_path) / "体检" / "reflect_report.md"
+        
+        # 防假零：丹房目录不存在说明 vault_path 错误，扫描结果必为 0，显式告警
+        if not self.丹房.exists():
+            log.warning(f"ReflectEngine: 丹房目录不存在（vault_path={self.vault_path}），"
+                        f"所有扫描将返回 0（假零）。请传入正确 vault_path 或设置 LINGTAI_VAULT 环境变量。")
         
         # 尝试加载 Hebbian 权重（用于断裂关联检测）
         self._hebbian = None
