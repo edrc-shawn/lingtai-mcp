@@ -120,7 +120,7 @@
 
 每次完成实质性操作后执行。丹房页写操作（`page_create`/`page_update`/`add_link`）已自动完成 §三①-④ 中的步骤①-③：
 
-0. **尺寸体检** → 检查 AGENTS.md 是否超限（≤300行 / ≤15KB）。超限则先精简再继续（历史叙事/失真统计数字迁 AGENTS-appendix.md 或删）。**净增 30 行红灯**：若本轮净增 > 30 行，说明塞了叙事而非规则，退回删/迁 docs。用 `wc -l AGENTS.md && wc -c AGENTS.md` 实测，勿写死自报数字（会永久过时）。
+0. **尺寸体检** → 检查 AGENTS.md 是否超限。Anthropic 官方目标 200 行，社区共识硬上限 300 行。超 300 行先精简再继续（历史叙事/失真统计数字迁 AGENTS-appendix.md 或删）。**净增 30 行红灯**：若本轮净增 > 30 行，说明塞了叙事而非规则，退回删/迁 docs。用 `wc -l AGENTS.md` 实测，勿写死自报数字（会永久过时）。参考：OpenAI Codex `project_doc_max_bytes` 默认 64KiB——AGENTS.md 当前 ~170 行远低于截断线，字节限制不设。
 1. **写丹房日志**（丹房页操作 → 自动）
 2. **重建灵识索引** → 调 `sys_refresh_index`
 3. **提 Git**（丹房页操作 → 自动；非丹房页需手动）。**commit 前缀**：`feat:`(新功能/新页) `fix:`(修 bug) `refine:`(提炼/规则改进) `docs:`(文档/内观)。
