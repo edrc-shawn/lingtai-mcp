@@ -294,6 +294,7 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
                 self._context_loaded = True
                 if not need_full:
                     self._write_heartbeat()
+                    self._context_cache["pending_consumed"] = self._pending_consumed
                     ce = self._detect_cross_end()
                     if ambient:
                         # 按需副本：注入 ambient 块但不污染缓存本体
@@ -329,6 +330,7 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
             if client_capabilities is None and (not detail or detail == "detailed"):
                 self._save_context_cache(raw)
             self._write_heartbeat()
+            self._context_cache["pending_consumed"] = self._pending_consumed
             ce = self._detect_cross_end()
             if ambient:
                 # 按需副本：注入 ambient 块但不污染缓存本体与落盘
@@ -356,19 +358,66 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
             self._context_loaded = True
             return fallback
 
-    # ─── 自动心跳（context_load 首次调用时触发）───
+    # ─── 自动心跳 + 补跑工作印记（context_load 首次调用时触发）───
     def _write_heartbeat(self):
-        """自动写心跳到 memory_bank——每次新会话首次 context_load 触发，不依赖 AI 自觉"""
+        """自动写心跳 + 消费积压工作印记——每次新会话首次 context_load 触发，不依赖 AI 自觉。
+        巡更 MCP 断线时积压的工作印记通过 pending_imprints.jsonl 在此补跑写入。"""
+        # 1. 心跳
         try:
             from datetime import datetime
             self.memory_bank.write(
                 content=f"工作印记：[auto] 客户端:{self.client} 活跃时间:{datetime.now().strftime('%m-%d %H:%M')}",
-                source="mcp",
+                source_type="mcp",
                 tags=["协作者-工作印记", "heartbeat"],
                 branch="通用",
             )
         except Exception:
             log.debug("suppressed", exc_info=True)
+        # 2. 消费积压工作印记（独立异常处理，不因消费失败丢心跳）
+        self._pending_consumed = self._consume_pending_imprints()
+
+    def _consume_pending_imprints(self) -> dict:
+        """消费 pending_imprints.jsonl 中的积压工作印记，逐条写入 memory_bank。
+        写入成功则删除对应条目，失败则保留（下次重试）。
+
+        Returns:
+            dict: {"consumed": N, "failed": M, "details": [...]}
+        """
+        pending_path = os.path.join(self.vault_path, ".tool", "lingtai-kb", "cache", "pending_imprints.jsonl")
+        result = {"consumed": 0, "failed": 0, "details": []}
+        if not os.path.exists(pending_path):
+            return result
+        try:
+            with open(pending_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            remaining = []
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    self.memory_bank.write(
+                        content=entry.get("content", ""),
+                        source_type=entry.get("source_type", "巡更"),
+                        tags=entry.get("tags", []),
+                        branch=entry.get("branch", "通用"),
+                    )
+                    result["consumed"] += 1
+                    result["details"].append({"status": "ok", "content": entry.get("content", "")[:80]})
+                except Exception as e:
+                    result["failed"] += 1
+                    result["details"].append({"status": "error", "error": str(e)[:120], "content": entry.get("content", "")[:80]})
+                    remaining.append(line + "\n")
+            if remaining:
+                with open(pending_path, "w", encoding="utf-8") as f:
+                    f.writelines(remaining)
+            else:
+                os.remove(pending_path)
+        except Exception as e:
+            result["failed"] = len(lines) if 'lines' in dir() else 0
+            result["details"].append({"status": "fatal", "error": str(e)[:120]})
+        return result
 
     # ─── topics_of_interest（知识库热点预计算，辅助 AI 决策是否调 inject）───
     def _compute_topics_of_interest(self) -> dict:
