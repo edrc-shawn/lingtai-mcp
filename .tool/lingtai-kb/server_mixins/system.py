@@ -172,8 +172,7 @@ class SystemMixin:
     def search_logs(self, keyword: str, days: int = 7) -> dict:
         """
         搜索日志和体检记录（v2 性能优化版）
-        - 主源：结构化机读日志 丹房/.meta/oplog.jsonl（按 t 时间戳过滤 + 关键字匹配），
-          仅在 oplog 缺失时降级到 丹房/日志.md 全文扫描
+        - 主源：结构化机读日志 丹房/.meta/oplog.jsonl（按 t 时间戳过滤 + 关键字匹配）
         - 进程内结果缓存（TTL 120s）：重复查询零重扫，避免同一会话连发时反复全量 IO
         - 输出归一化：所有结果统一带 content 字段，修复原版体检命中在 knowledge_search
           追加段被静默丢弃的问题（原版体检结果只给 matches/snippets，_append_log_results 取不到）
@@ -232,21 +231,6 @@ class SystemMixin:
             except (OSError, UnicodeDecodeError) as e:
                 results.append({"source": "丹房/.meta/oplog.jsonl", "error": f"读取失败: {e}"})
 
-        # ── 降级：日志.md 全文扫描（仅 oplog 缺失时启用）──
-        if not used_oplog:
-            log_path = os.path.join(vault, "丹房", "日志.md")
-            if os.path.isfile(log_path):
-                try:
-                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                        for line in f:
-                            if keyword_lower in line.lower():
-                                results.append({
-                                    "source": "丹房/日志.md",
-                                    "content": line.strip()[:200],
-                                })
-                except (OSError, UnicodeDecodeError) as e:
-                    results.append({"source": "丹房/日志.md", "error": f"读取失败: {e}"})
-
         # ── 体检/ 目录（mtime 窗口过滤 + 关键字匹配）──
         exam_dir = os.path.join(vault, "体检")
         if os.path.isdir(exam_dir):
@@ -281,8 +265,8 @@ class SystemMixin:
             "days": days,
             "total_matches": len(results),
             "results": results[:20],
-            "source": "oplog" if used_oplog else "日志.md",
-            "note": "从 丹房/.meta/oplog.jsonl（机读版，主）+ 体检/ 检索；日志.md 为降级源",
+            "source": "oplog",
+            "note": "从 丹房/.meta/oplog.jsonl（机读版）+ 体检/ 检索",
         }
         self._log_search_cache_set(cache_key, data)
         return data
@@ -546,6 +530,58 @@ class SystemMixin:
         except Exception:
             log.debug("suppressed", exc_info=True)
 
+        # ── 域间密度对比（方向二：缺口驱动推荐）──
+        # 扫描丹房各域页面数，检测密度不均，主动建议补薄弱域
+        try:
+            import os as _os2, glob as _glob2
+            danfang_dir = _os2.path.join(self.vault_path, '丹房')
+            domain_counts = {}
+            if _os2.path.isdir(danfang_dir):
+                for entry in _os2.listdir(danfang_dir):
+                    domain_path = _os2.path.join(danfang_dir, entry)
+                    if _os2.path.isdir(domain_path):
+                        md_count = len(_glob2.glob(_os2.path.join(domain_path, '*.md')))
+                        if md_count > 0:
+                            domain_counts[entry] = md_count
+            if domain_counts:
+                sorted_domains = sorted(domain_counts.items(), key=lambda x: -x[1])
+                thickest_domain, thickest_count = sorted_domains[0]
+                thinnest_domain, thinnest_count = sorted_domains[-1]
+                ratio = thickest_count / max(thinnest_count, 1)
+                # 触发条件：最厚/最薄 >= 5 倍，或最薄域 <= 5 页
+                trigger = ratio >= 5 or thinnest_count <= 5
+                _DOMAIN_LABELS = {
+                    "00-思考与认知": "认知框架",
+                    "01-内容创作": "内容创作",
+                    "02-成长与日常": "成长日常",
+                    "03-社会观察": "社会观察",
+                    "04-身体与健康": "身体健康",
+                    "05-哲学与思想": "哲学思想",
+                    "06-商业与投资": "商业投资",
+                    "07-工具与AI": "工具与AI",
+                    "08-教育": "教育",
+                    "99-一人公司": "一人公司",
+                }
+                thin_label = _DOMAIN_LABELS.get(thinnest_domain, thinnest_domain)
+                thick_label = _DOMAIN_LABELS.get(thickest_domain, thickest_domain)
+                suggestion = None
+                if trigger:
+                    suggestion = (
+                        f"知识密度不均：「{thick_label}」域 {thickest_count} 页 vs "
+                        f"「{thin_label}」域 {thinnest_count} 页（{ratio:.1f}倍）。"
+                        f"如果要做变现/输出，「{thin_label}」可能是短板——值得补一补。"
+                    )
+                data["domain_balance"] = {
+                    "thickest": {"domain": thickest_domain, "count": thickest_count},
+                    "thinnest": {"domain": thinnest_domain, "count": thinnest_count},
+                    "ratio": round(ratio, 1),
+                    "trigger": trigger,
+                    "suggestion": suggestion,
+                    "all_domains": dict(sorted_domains),
+                }
+        except Exception:
+            log.debug("suppressed", exc_info=True)
+
         self.__dict__["_health_inspect_cache"] = {"_ts": datetime.now(), "data": data}
         return data
 
@@ -684,6 +720,84 @@ class SystemMixin:
                 return {"action": "close", "gap": gap, "error": "未找到匹配缺口"}
 
         return {"error": f"未知操作: {action}"}
+
+    @tool(readonly=True, write=False, category="system", system=False, name="session_broker_status")
+    def session_broker_status(self) -> dict:
+        """查询当前活跃会话——哪些桌面端（Reasonix/WorkBuddy等）正在连接灵台 MCP。
+        
+        返回当前所有活跃/过期会话列表，按端聚合统计，附带最近变更事件。
+        场景：多端并行时灵识想知道"我现在不是一个人在干活"。
+        """
+        try:
+            from session_tracker import _broker, _event_bus
+            result = _broker.status()
+            result["recent_events"] = _event_bus.recent(10)
+            return result
+        except Exception as e:
+            return {"error": str(e), "active_sessions": 0, "sessions": []}
+
+    @tool(readonly=True, write=False, category="system", system=False, name="event_bus_poll")
+    def event_bus_poll(self, since: str = "", client_filter: str = "", max_events: int = 20) -> dict:
+        """拉取变更事件——查看其他端最近做了什么操作。
+
+        Args:
+            since: ISO 时间戳，只返回该时间之后的事件（空=返回全部）
+            client_filter: 只返回指定客户端的事件（空=不过滤）
+            max_events: 最大返回条数（默认 20）
+
+        Returns:
+            dict: 事件列表 + 统计
+        """
+        try:
+            from session_tracker import _event_bus
+            events = _event_bus.poll(since=since, client_filter=client_filter)
+            if len(events) > max_events:
+                events = events[-max_events:]
+            return {
+                "total_events": len(events),
+                "events": events,
+                "note": "事件保留最近 100 条，环形缓冲区",
+            }
+        except Exception as e:
+            return {"error": str(e), "total_events": 0, "events": []}
+
+    @tool(readonly=False, write=True, category="system", system=False, name="lease_acquire")
+    def lease_acquire(self, resource: str, duration: int = 30, force: bool = False) -> dict:
+        """获取排他性资源租约——确保同一时间只有一个端操作排他资源。
+
+        Args:
+            resource: 资源标识（如 "page:丹房/00-思考与认知/含人量"）
+            duration: 租约时长（秒，默认 30，最大 300）
+            force: 是否强制获取（会释放已有租约，默认 False）
+
+        Returns:
+            dict: 成功/失败 + 租约信息
+        """
+        from session_tracker import _lease_manager
+        client = getattr(self, 'client', 'unknown')
+        duration = min(max(duration, 5), 300)
+        return _lease_manager.acquire(resource, client, duration=duration, force=force)
+
+    @tool(readonly=False, write=True, category="system", system=False, name="lease_release")
+    def lease_release(self, resource: str) -> dict:
+        """释放排他性资源租约。
+
+        Args:
+            resource: 资源标识（与 acquire 时一致）
+        """
+        from session_tracker import _lease_manager
+        client = getattr(self, 'client', 'unknown')
+        return _lease_manager.release(resource, client=client)
+
+    @tool(readonly=True, write=False, category="system", system=False, name="lease_status")
+    def lease_status(self, resource: str = "") -> dict:
+        """查询排他性资源租约状态。
+
+        Args:
+            resource: 资源标识（空=返回全部活跃租约）
+        """
+        from session_tracker import _lease_manager
+        return _lease_manager.status(resource=resource)
 
     @tool(readonly=False, write=True, category="system", system=True, name="system_restart")
     def restart(self) -> dict:
@@ -1049,7 +1163,7 @@ class SystemMixin:
                 results["errors"].append(f"{mod_name} 重载失败: {str(e)}")
 
         # 2.5 显式重载核心引擎模块（可能被 module-level import 引用但不在 sys.modules）
-        for mod_name in ['degradation', 'memory_engine', 'perception', 'memory_bank.bank']:
+        for mod_name in ['degradation', 'memory_engine', 'perception', 'memory_bank.bank', 'skill_router']:
             try:
                 if mod_name in sys.modules:
                     importlib.reload(sys.modules[mod_name])
@@ -1244,9 +1358,9 @@ class SystemMixin:
     @tool(readonly=False, write=True, category="system", system=True, name="system_check_status")
     def check_status(self) -> dict:
         """
-        检查外部变更状态（git status + 最近10条操作日志）
+        检查外部变更状态（git status + 最近10条操作记录）
         """
-        import subprocess
+        import subprocess, json
         vault = VAULT_PATH
         repo = os.path.dirname(vault)
         
@@ -1256,17 +1370,28 @@ class SystemMixin:
         )
         dirty = result.stdout.strip()
         
-        log_path = os.path.join(vault, '丹房', '日志.md')
+        # 读 oplog 获取近期操作（人类版日志.md 已退役）
         recent_ops = []
-        if os.path.isfile(log_path):
-            with open(log_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            for line in reversed(lines[-30:]):
-                line = line.strip()
-                if line.startswith('['):
-                    recent_ops.append(line)
-                    if len(recent_ops) >= 10:
-                        break
+        oplog_path = os.path.join(vault, '丹房', '.meta', 'oplog.jsonl')
+        if os.path.isfile(oplog_path):
+            try:
+                with open(oplog_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                for line in reversed(lines[-30:]):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    summary = entry.get("summary", "")
+                    if summary:
+                        recent_ops.append(summary)
+                        if len(recent_ops) >= 10:
+                            break
+            except (OSError, UnicodeDecodeError):
+                recent_ops = []
         
         return {
             "has_changes": bool(dirty),

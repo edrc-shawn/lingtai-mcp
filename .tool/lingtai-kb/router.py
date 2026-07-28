@@ -12,6 +12,7 @@ from concurrency import with_write_lock
 from schema_validator import validate_page_create
 from server_mixins.shared import get_session_logger
 from decorators import REGISTRY, export_tools_list
+from idempotency import _idempotency_cache
 
 # ═══════════════════════════════════════════
 # 服务端单例
@@ -51,6 +52,10 @@ def _build_handler(name, info):
         "memory": "memory",
         "refine": "raw",
         "system": "index",
+        "page": "page",
+        "output": "output",
+        "pipeline": "pipeline",
+        "health": "health",
     }
     resource = _RESOURCE_MAP.get(category, "default")
 
@@ -259,7 +264,7 @@ def _mw_parse(state):
 
 
 def _mw_initialize(state):
-    """initialize: 捕获端标识 → 返回协议信息"""
+    """initialize: 捕获端标识 → 注册会话 → 返回协议信息"""
     if state["method"] != "initialize":
         return
     try:
@@ -269,6 +274,9 @@ def _mw_initialize(state):
         _CLIENT_ALIAS = {"connector:custom-mcp:lingtai-kb": "workbuddy"}
         cname = _CLIENT_ALIAS.get(cname, cname)
         server.set_client(cname, ci.get("version"))
+        # 注册会话到 SessionBroker
+        from session_tracker import _broker
+        _broker.register(cname, ci.get("version", ""))
     except Exception:
         pass
     return {
@@ -310,7 +318,7 @@ def _mw_lazy_context(state):
 
 
 def _mw_execute(state):
-    """执行工具 + 记录会话"""
+    """执行工具 + 记录会话 + 幂等键保护"""
     if state["method"] != "tools/call":
         return
     name = state["tool_name"]
@@ -326,13 +334,45 @@ def _mw_execute(state):
             "id": state["req_id"],
             "error": {"code": -32601, "message": f"Unknown tool: {name}"},
         }
+
+    # 幂等键：仅写工具启用
+    info = REGISTRY.get(name)
+    is_write = info and info.get("write", False)
+    ikey = _idempotency_cache.extract_key(state["params"]) if is_write else ""
+
+    # Session 心跳
     try:
-        result = handler(state["args"])
+        from session_tracker import _broker
+        _broker.heartbeat(getattr(server, "client", "unknown"))
+    except Exception:
+        pass
+
+    try:
+        if ikey:
+            result = _idempotency_cache.get_or_compute(ikey, lambda: handler(state["args"]))
+        else:
+            result = handler(state["args"])
+
         data = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
         try:
             get_session_logger().record_call(name, len(data), client=getattr(server, "client", "unknown"))
         except Exception:
             pass
+
+        # Event Bus 变更广播：写操作成功后发布事件
+        if is_write:
+            try:
+                from session_tracker import _event_bus
+                client = getattr(server, "client", "unknown")
+                # 从 category 推断资源类型
+                cat = (info or {}).get("category", "")
+                resource_map = {"page": "page", "memory": "memory", "refine": "raw",
+                                "output": "output", "pipeline": "skillopt", "health": "health"}
+                resource = resource_map.get(cat, "unknown")
+                _event_bus.publish(client, name, resource)
+            except Exception:
+                pass
+
         return {
             "jsonrpc": "2.0",
             "id": state["req_id"],

@@ -13,23 +13,22 @@ from logger import get_logger
 log = get_logger(__name__)
 
 class PageMixin:
+    def _page_etag(self, abs_path: str) -> str:
+        """返回页面文件的 etag（基于 mtime），用于乐观锁冲突检测。"""
+        try:
+            mtime = os.path.getmtime(abs_path)
+            return f"{os.path.getsize(abs_path)}-{int(mtime)}"
+        except (OSError, ValueError):
+            return ""
+
     def _log_and_commit(self, log_type, summary, links, commit_msg):
-        """写工具自动追加日志.md + oplog.jsonl + git commit（§5.1-5.3 的落地保障）"""
+        """写工具自动追加 oplog.jsonl + git commit（§5.1-5.3 的落地保障）"""
         import os, json, subprocess
         from datetime import datetime
         now = datetime.now()
         vault = self.vault_path
         repo = os.path.dirname(vault)
-        ts = now.strftime('%y-%m-%d %H:%M')
         iso_ts = now.strftime('%Y-%m-%dT%H:%M:00+08:00')
-        log_path = os.path.join(vault, '丹房', '日志.md')
-        links_str = ', '.join(links)
-        log_line = f'\n[{ts}] MCP | {log_type} | {summary} | → {links_str}\n'
-        try:
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(log_line)
-        except Exception:
-            log.debug("suppressed", exc_info=True)
         oplog_path = os.path.join(vault, '丹房', '.meta', 'oplog.jsonl')
         entry = {"t": iso_ts, "op": "MCP", "mode": "auto", "model": None, "type": log_type, "summary": summary, "links": links}
         try:
@@ -39,7 +38,7 @@ class PageMixin:
         except Exception:
             log.debug("suppressed", exc_info=True)
         try:
-            # 暂存 ①：git add -u 处理已跟踪文件的修改（日志.md / oplog.jsonl / 索引等）
+            # 暂存 ①：git add -u 处理已跟踪文件的修改（oplog.jsonl / 索引等）
             subprocess.run(f'cd "{repo}" && git add -u',
                            shell=True, capture_output=True, text=True, timeout=30)
             # 暂存 ②：显式 git add 本操作涉及的页面路径。
@@ -187,6 +186,7 @@ class PageMixin:
             "domain": domain,
             "message": f"已在 {domain} 域创建知识点「{safe_title}」",
             "volatile_warning": volatile_warning,
+            "etag": self._page_etag(abs_path),
         }
         if quota_warnings:
             result["quota_warnings"] = quota_warnings
@@ -308,7 +308,7 @@ class PageMixin:
             commit_msg=f"refine: {path}",
         )
 
-        meta = {"success": True, "path": path, "appended": append, "chars_added": len(content)}
+        meta = {"success": True, "path": path, "appended": append, "chars_added": len(content), "etag": self._page_etag(abs_path)}
         if has_two_zone:
             meta["compiled_truth"] = True
             if timeline_mode:
@@ -318,7 +318,8 @@ class PageMixin:
         return meta
 
     @tool(readonly=False, write=True, category="page", system=False, name="page_append_section")
-    def append_section(self, page: str, section: str, content: str, position: str = "after") -> dict:
+    def append_section(self, page: str, section: str, content: str, position: str = "after",
+                        expected_etag: str = "") -> dict:
         """
         章节级精准插入（定位到指定 ## 标题，不动页面其他部分）。
         场景：只在页面某个章节下补充内容时（如波及分析补引用、某节追加条目）。
@@ -329,6 +330,7 @@ class PageMixin:
             section: 目标章节标题（如 "## 方案全景对比"，支持 prefix 匹配）
             content: 要追加的 Markdown 内容
             position: "after"=插在章节末尾（默认） / "before"=插在章节之前
+            expected_etag: 期望的页面 etag（乐观锁）。不传或空则跳过检查。
 
         Returns:
             dict: 操作结果
@@ -347,6 +349,18 @@ class PageMixin:
         
         if not content:
             return {"success": False, "error": "content 参数不能为空"}
+        
+        # etag 乐观锁检查
+        if expected_etag:
+            current_etag = self._page_etag(abs_path)
+            if current_etag and current_etag != expected_etag:
+                return {
+                    "success": False,
+                    "error": "页面已被其他端修改，请重新读取后重试（etag 不匹配）",
+                    "path": page_path,
+                    "expected_etag": expected_etag,
+                    "current_etag": current_etag,
+                }
         
         with open(abs_path, 'r', encoding='utf-8') as f:
             full = f.read()
@@ -452,6 +466,7 @@ class PageMixin:
             "section": section,
             "position": position,
             "chars_added": len(content),
+            "etag": self._page_etag(abs_path),
         }
 
     @tool(readonly=False, write=True, category="page", system=False, name="page_compress")

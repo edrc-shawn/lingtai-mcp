@@ -59,7 +59,7 @@ class PerceptionMixin:
             self.user_profile.record_interest("注入")
         return result
     
-    @tool(readonly=False, write=True, category="knowledge", system=False, name="raw_save")
+    @tool(readonly=False, write=True, category="refine", system=False, name="raw_save")
     def save(self, content: str, category: str = "", source: str = "对话") -> dict:
         """
         保存原始素材到 原料/ 目录（待提炼，不直接可检索）。
@@ -130,33 +130,25 @@ class PerceptionMixin:
         return result
 
     def _save_system_feedback(self, content: str, source: str = "") -> dict:
-        """系统反馈路由：写入日志而非原料，不参与提炼"""
+        """系统反馈路由：写入 oplog.jsonl 而非日志.md/原料，不参与提炼"""
         import os
         from datetime import datetime
         vault = getattr(self, 'vault_path', None) or r"."
-        log_path = os.path.join(vault, '丹房', '日志.md')
         oplog_path = os.path.join(vault, '丹房', '.meta', 'oplog.jsonl')
 
         now = datetime.now()
-        dt = now.strftime('%y-%m-%d %H:%M')
         iso = now.isoformat()
-
-        # 人类版日志
-        summary = content[:60].replace('\n', ' ')
-        line = f"[{dt}] WB dialog | 系统 | {summary} | → {source}\n"
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(line)
 
         # 机读版日志
         import json
+        summary = content[:60].replace('\n', ' ')
         entry = {"t": iso, "op": "WB", "mode": "dialog", "type": "系统",
                  "summary": summary, "source": source, "links": []}
         os.makedirs(os.path.dirname(oplog_path), exist_ok=True)
         with open(oplog_path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
 
-        return {"success": True, "route": "log", "message": f"系统反馈已写入日志: {summary}"}
+        return {"success": True, "route": "log", "message": f"系统反馈已写入 oplog: {summary}"}
 
     def recommend(self, current_topic: str, max_results: int = 5) -> dict:
         """
@@ -581,36 +573,24 @@ class PerceptionMixin:
 
         preamble = {"active_sessions": 1}
 
-        # 1. 活跃会话数 — 读取 session_tracker 日志统计近 2h 调用
+        # 1. 活跃会话数 — 使用 SessionBroker 实时检测
         try:
-            vault = getattr(self, 'vault_path', None) or _os.environ.get(
-                "LINGTAI_VAULT", r"."
-            )
-            slog = _os.path.join(vault, ".tool", "lingtai-kb", "logs", "tool_sessions.jsonl")
-            if _os.path.isfile(slog):
-                now = _time.time()
-                seen_pids = set()
-                with open(slog, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            entry = _json.loads(line)
-                            ts = entry.get("ts", "")
-                            if ts:
-                                from datetime import datetime as _dt
-                                try:
-                                    parsed = _dt.fromisoformat(ts)
-                                    if (now - parsed.timestamp()) < 7200:
-                                        seen_pids.add(entry.get("pid", 0))
-                                except (ValueError, TypeError):
-                                    pass
-                        except _json.JSONDecodeError:
-                            pass
-                preamble["active_sessions"] = max(1, min(len(seen_pids), 5))
+            from session_tracker import _broker, _event_bus
+            broker_status = _broker.status()
+            active = broker_status.get("active_sessions", 0)
+            preamble["active_sessions"] = max(1, active)
+            if active >= 2:
+                preamble["other_clients"] = [
+                    {"client": s["client"], "tool_count": s["tool_count"]}
+                    for s in broker_status.get("sessions", [])
+                    if s.get("status") == "active"
+                ]
+                # 附带最近 3 条跨端事件
+                recent_events = _event_bus.recent(5)
+                if recent_events:
+                    preamble["recent_events"] = recent_events
         except Exception:
-            preamble["active_sessions"] = 1
+            pass
 
         # 2. 场景关联教训 — 从 lessons 中筛选当前场景相关的
         try:

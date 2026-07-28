@@ -75,6 +75,19 @@ class MemoryBankMixin:
                     if w not in existing_tags:
                         tags.append(w)
 
+        # ── 自动注入 namespace（三层记忆模型）──
+        # 未显式设置 expected_consumer 时，自动注入当前客户端名
+        # 当前客户端从 server.client 获取（由 router 在 initialize 时设置）
+        # 空 consumer = global（所有端可见）
+        # agent:{client_id} = 仅该端可见
+        if not expected_consumer:
+            try:
+                client = getattr(self, 'client', '') or getattr(self, 'client_version', '')
+                if client and client != 'unknown':
+                    expected_consumer = f"agent:{client}"
+            except Exception:
+                pass
+
         return self.memory_bank.write(content, source, tags=tags, branch=branch,
                                       knowledge_candidate=knowledge_candidate, context=context, why=why,
                                       expected_consumer=expected_consumer, expiry_policy=expiry_policy)
@@ -100,7 +113,19 @@ class MemoryBankMixin:
                          语义模型已在启动时后台预热（~30-40s），首调不需要额外等待。
                          注意：Python 3.14 + torch 不兼容时需设置 LINGTAI_DISABLE_SEMANTIC=1。
         consumer 可选，按预期消费者过滤（如 "reasonix" / "workbuddy"），空=不过滤。
+        未传 consumer 时，自动按当前端过滤（仅返回当前端私有记忆 + 全局记忆）。
         """
+        # ── 自动 namespace 过滤（三层记忆模型）──
+        # 未显式设置 consumer 时，自动注入当前客户端名
+        # 仅返回：当前端私有记忆 + 全局记忆（无 expected_consumer）
+        if not consumer:
+            try:
+                client = getattr(self, 'client', '') or getattr(self, 'client_version', '')
+                if client and client != 'unknown':
+                    consumer = f"agent:{client}"
+            except Exception:
+                pass
+
         status = "" if include_pending else "active"
         results = self.memory_bank.query(keyword=keyword, min_confidence=min_confidence,
                                          branch=branch, include_archived=include_archived,
@@ -113,7 +138,8 @@ class MemoryBankMixin:
                 from memory_bank.semantic_retriever import search, merge_results
                 all_mems = self.memory_bank.query(keyword="", status="",
                                                   min_confidence=0.0, branch="",
-                                                  include_archived=include_archived)
+                                                  include_archived=include_archived,
+                                                  consumer=consumer)
                 semantic_hits = search(keyword, all_mems, top_k=top_k)
                 if semantic_hits:
                     results = merge_results(results, semantic_hits, top_k=top_k)
@@ -187,18 +213,28 @@ class MemoryBankMixin:
 
     @tool(readonly=True, write=True, category="memory", system=True, name="memory_decay")
     def mem_decay(self) -> dict:
-        """执行衰减调度（完整管线：衰减 + pending 晋升 + 超时 pending 清理）"""
+        """执行衰减调度（完整管线：衰减 + pending 晋升 + 超时 pending 清理 + session 临时记忆过期）"""
         from memory_bank.decay import DecayScheduler
         decay = DecayScheduler(self.memory_bank)
         result = decay.run()
         promoted = decay.run_pending_promotion()
         cleaned = decay.cleanup_stale_pending()
+        # session 临时记忆清理：联动 SessionBroker 清理过期会话的记忆
+        session_cleaned = {"archived": 0}
+        try:
+            from session_tracker import _broker
+            pruned = _broker.prune(cleanup_callback=self.memory_bank.cleanup_session_scope)
+            if pruned:
+                session_cleaned = self.memory_bank.cleanup_session_scope()
+        except Exception:
+            pass
         return {
             "decayed": result.get("decayed", 0),
             "deprecated": result.get("deprecated", 0),
             "archived": result.get("archived", 0),
             "promoted": promoted.get("promoted", 0),
             "cleaned": cleaned.get("cleaned", 0),
+            "session_cleaned": session_cleaned.get("archived", 0),
             "details": result.get("details", []),
         }
 

@@ -10,6 +10,7 @@ import json
 import hashlib
 import re
 import sys
+import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -60,6 +61,7 @@ class MemoryBank:
         self.conflict = ConflictDetector()
         self.audit_log = AuditLog(data_dir=str(self.data_dir))
         self.registry = registry if registry is not None else ContentRegistry(vault_path)
+        self._lock = threading.RLock()  # 写操作可重入互斥锁（write→_save 嵌套调用安全）
         self.memories: List[Memory] = self._load()
         self._id_index: dict = {}  # {memory_id: Memory} O(1) 检索
         self._keyword_index: dict = {}  # {word: set(memory_ids)} 倒排索引
@@ -134,10 +136,11 @@ class MemoryBank:
 
     def _rebuild_index(self):
         """重建 _id_index + _keyword_index（_load 后、或 memories 被外部修改后调用）"""
-        self._id_index = {m.id: m for m in self.memories}
-        self._keyword_index = {}
-        for m in self.memories:
-            self._index_keywords(m)
+        with self._lock:
+            self._id_index = {m.id: m for m in self.memories}
+            self._keyword_index = {}
+            for m in self.memories:
+                self._index_keywords(m)
 
     def _index_put(self, memory):
         """写入新记忆时同步更新索引（id 索引 + 关键词倒排索引）"""
@@ -204,6 +207,16 @@ class MemoryBank:
                expected_consumer: str = "", expiry_policy: str = None) -> dict:
         """
         写入记忆（含冲突检测 + 内容注册表 + merge_policy + 场景分支）
+        """
+        with self._lock:
+            return self._write_unlocked(content, source_type, context, tags, branch,
+                                         knowledge_candidate, why, expected_consumer, expiry_policy)
+
+    def _write_unlocked(self, content: str, source_type: str, context: dict = None, tags: list = None,
+                         branch: str = "", knowledge_candidate: bool = False, why: str = "",
+                         expected_consumer: str = "", expiry_policy: str = None) -> dict:
+        """
+        写入记忆（无锁版本，由 write() 持有锁后调用）
 
         Args:
             content: 记忆内容
@@ -497,7 +510,11 @@ class MemoryBank:
 
     def update_confidence(self, memory_id: str, delta: float) -> dict:
         """更新置信度 — O(1) 哈希索引"""
-        m = self._id_index.get(memory_id)
+        with self._lock:
+            return self._update_confidence_unlocked(memory_id, delta)
+
+    def _update_confidence_unlocked(self, memory_id: str, delta: float) -> dict:
+        """更新置信度（无锁版本）"""
         if not m:
             return {"success": False, "error": "not found"}
         old_status = m.status
@@ -536,7 +553,6 @@ class MemoryBank:
         from datetime import datetime
         vault = getattr(self, 'vault_path', os.environ.get("LINGTAI_VAULT", r"."))
         raw_dir = os.path.join(vault, "原料", "教训")
-        log_path = os.path.join(vault, "丹房", "日志.md")
 
         summary = m.content[:80].replace('\n', ' ')
 
@@ -568,23 +584,15 @@ class MemoryBank:
 
         m.status = "archived"
         self._audit("graduate", m.id, f"evidence={m.evidence_count}")
-
-        try:
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            now = datetime.now().strftime('%y-%m-%d %H:%M')
-            tags = ",".join(m.tags) if m.tags else ""
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(f"[{now}] WB auto | 教训毕业 | {summary} | → 原料/教训/{slug}.md | tags={tags}\n")
-        except:
-            pass
         return {"summary": summary, "evidence": m.evidence_count, "raw_path": raw_path}
 
     def evidence_increment(self, memory_id: str, boost: float = 0.1) -> dict:
-        """证据计数+1 并轻度提升置信度（验证闭环核心）— O(1) 哈希索引
-        语义：被明确采纳/验证 = 证据+1 + 置信度微升 + 刷新验证时间；
-        pending 累计达 3 次自动转 active。解决"只减不增"与"pending 永不通不过晋升"。
-        """
-        m = self._id_index.get(memory_id)
+        """证据计数+1 并轻度提升置信度（验证闭环核心）"""
+        with self._lock:
+            return self._evidence_increment_unlocked(memory_id, boost)
+
+    def _evidence_increment_unlocked(self, memory_id: str, boost: float = 0.1) -> dict:
+        """证据计数+1（无锁版本）"""
         if not m:
             return {"success": False, "error": "not found"}
         m.evidence_count += 1
@@ -598,7 +606,11 @@ class MemoryBank:
 
     def deprecate(self, memory_id: str, reason: str = "") -> dict:
         """废弃记忆 — O(1) 哈希索引"""
-        m = self._id_index.get(memory_id)
+        with self._lock:
+            return self._deprecate_unlocked(memory_id, reason)
+
+    def _deprecate_unlocked(self, memory_id: str, reason: str = "") -> dict:
+        """废弃记忆（无锁版本）"""
         if not m:
             return {"success": False, "error": "not found"}
         m.status = "deprecated"
@@ -608,7 +620,11 @@ class MemoryBank:
 
     def archive(self, memory_id: str) -> dict:
         """归档记忆 — O(1) 哈希索引"""
-        m = self._id_index.get(memory_id)
+        with self._lock:
+            return self._archive_unlocked(memory_id)
+
+    def _archive_unlocked(self, memory_id: str) -> dict:
+        """归档记忆（无锁版本）"""
         if not m:
             return {"success": False, "error": "not found"}
         m.status = "archived"
@@ -629,16 +645,12 @@ class MemoryBank:
         return abs_p if os.path.isfile(abs_p) else None
 
     def set_knowledge_link(self, memory_id: str, links, mode: str = "add") -> dict:
-        """建立记忆→知识的受控 wikilink（单向桥，不污染知识图）。
+        """建立记忆→知识的受控 wikilink（单向桥，不污染知识图）。"""
+        with self._lock:
+            return self._set_knowledge_link_unlocked(memory_id, links, mode)
 
-        Args:
-            memory_id: 记忆 ID
-            links: 目标丹房页路径（str 或 list），如 "丹房/07-工具与AI/AI Agent 记忆系统方案对比"
-            mode: "add"（默认，去重追加）/ "replace"（替换）
-        Returns:
-            dict: 操作结果，含最终 knowledge_links 与 graduated_at
-        """
-        m = self._id_index.get(memory_id)
+    def _set_knowledge_link_unlocked(self, memory_id: str, links, mode: str = "add") -> dict:
+        """建立记忆→知识的受控 wikilink（无锁版本）"""
         if not m:
             return {"success": False, "error": "not found"}
         if isinstance(links, str):
@@ -732,9 +744,12 @@ class MemoryBank:
     # === 衰减 ===
 
     def decay(self, observation_ref=None) -> dict:
-        """衰减调度：遍历active记忆，按类型衰减置信度。可选联动观察层衰减。
-        连续衰减周期跟踪：置信度连续 N 次低于阈值则归档。"""
-        decayed = 0
+        """衰减调度：遍历active记忆，按类型衰减置信度。可选联动观察层衰减。"""
+        with self._lock:
+            return self._decay_unlocked(observation_ref)
+
+    def _decay_unlocked(self, observation_ref=None) -> dict:
+        """衰减调度（无锁版本）"""
         deprecated = 0
         archived = 0
         for m in self.memories:
@@ -806,3 +821,19 @@ class MemoryBank:
             "avg_confidence": avg_confidence,
             "branch_distribution": branch_dist,
         }
+
+    def cleanup_session_scope(self) -> dict:
+        """清理所有 session_scope 临时记忆（归档）。
+
+        由 SessionBroker.prune() 在会话过期后联动调用，
+        确保临时记忆不会永久堆积。
+        """
+        with self._lock:
+            count = 0
+            for m in self.memories:
+                if m.expiry_policy == "session_scope" and m.status != "archived":
+                    m.status = "archived"
+                    count += 1
+            if count:
+                self._save()
+        return {"archived": count}
