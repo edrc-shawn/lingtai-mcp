@@ -83,7 +83,7 @@ class MemoryBankMixin:
     def mem_query(self, keyword: str = None, min_confidence: float = 0.0, branch: str = "",
                    include_archived: bool = False, include_pending: bool = True,
                    min_relevance: float = 0.0, normalize_dates: bool = False,
-                   semantic: bool = False, consumer: str = "", top_k: int = 20) -> dict:
+                   semantic: bool = True, consumer: str = "", top_k: int = 20) -> dict:
         """检索记忆银行中的教训/偏好/纠正/决策记录。
         场景：找"之前发生过什么""用户纠正过什么""上次怎么决定的""我的偏好是什么"时。
         区别：找知识概念用 knowledge_search；找会话级交互日志用 episodic_search；获取完整会话上下文用 context_load。
