@@ -1880,6 +1880,7 @@ class KnowledgeMixin:
                 status="active",
                 min_confidence=0.3,
                 include_archived=False,
+                audit_source="knowledge_bridge",
             )
         except Exception:
             return []

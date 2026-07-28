@@ -485,26 +485,62 @@ class SystemMixin:
         except Exception:
             data["memory_conflicts"] = {"count": 0, "conflicts": []}
 
-        # 召回效能审计（P0：接通 audit.py 已设计的 query_hit/query_miss）
+        # 召回效能审计（P0：接通 audit.py 已设计的 query_hit/query_miss，分层统计）
         try:
             _audit = self.memory_bank.audit_log
-            _stats = _audit.get_stats(days=7)
-            _by_action = _stats.get("by_action", {})
-            _hit_count = _by_action.get("query_hit", 0)
-            _miss_count = _by_action.get("query_miss", 0)
-            _total_queries = _hit_count + _miss_count
-            _empty_rate = round(_miss_count / max(_total_queries, 1) * 100, 1) if _total_queries > 0 else 0.0
-            # 被引用最多的记忆（召回最多的 Top 3）
-            _ref_entries = _audit.get_entries(action="query_hit", days=7)
+            _all_entries = _audit.get_entries(days=7)
             from collections import Counter as _Counter
-            _hit_ids = _Counter(e.get("memory_id", "") for e in _ref_entries if e.get("memory_id"))
+            import re as _re
+            # 按 source 分组统计
+            _by_source = {"memory_search": {"hit": 0, "miss": 0}, "knowledge_bridge": {"hit": 0, "miss": 0}}
+            for e in _all_entries:
+                action = e.get("action", "")
+                if action not in ("query_hit", "query_miss"):
+                    continue
+                detail = e.get("detail", "")
+                src_match = _re.search(r"source=(\w+)", detail)
+                src = src_match.group(1) if src_match else "memory_search"
+                if src not in _by_source:
+                    _by_source[src] = {"hit": 0, "miss": 0}
+                if action == "query_hit":
+                    _by_source[src]["hit"] += 1
+                else:
+                    _by_source[src]["miss"] += 1
+            # 计算各来源的空召回率
+            _sources_report = {}
+            _alerts = []
+            for src, counts in _by_source.items():
+                total = counts["hit"] + counts["miss"]
+                rate = round(counts["miss"] / max(total, 1) * 100, 1) if total > 0 else 0.0
+                # 知识桥接空召回率高是正常的（记忆银行不含知识性内容），阈值 80%
+                # 纯记忆检索空召回率 >50% 才告警
+                threshold = 80 if src == "knowledge_bridge" else 50
+                alert = rate > threshold and total >= 3
+                if alert:
+                    _alerts.append(src)
+                _sources_report[src] = {
+                    "total": total,
+                    "hit": counts["hit"],
+                    "miss": counts["miss"],
+                    "empty_recall_rate": rate,
+                    "alert": alert,
+                }
+            # 被引用最多的记忆（召回最多的 Top 3）
+            _hit_entries = [e for e in _all_entries if e.get("action") == "query_hit"]
+            _hit_ids = _Counter(e.get("memory_id", "") for e in _hit_entries if e.get("memory_id"))
             _top_recalled = [{"id": mid, "hit_count": cnt} for mid, cnt in _hit_ids.most_common(3)]
+            # 汇总
+            _total_hit = sum(s["hit"] for s in _sources_report.values())
+            _total_miss = sum(s["miss"] for s in _sources_report.values())
+            _total_queries = _total_hit + _total_miss
+            _overall_rate = round(_total_miss / max(_total_queries, 1) * 100, 1) if _total_queries > 0 else 0.0
             data["recall_efficacy"] = {
                 "total_queries_7d": _total_queries,
-                "hit_count": _hit_count,
-                "miss_count": _miss_count,
-                "empty_recall_rate": _empty_rate,
-                "alert": _empty_rate > 50 and _total_queries >= 3,
+                "hit_count": _total_hit,
+                "miss_count": _total_miss,
+                "empty_recall_rate": _overall_rate,
+                "by_source": _sources_report,
+                "alerts": _alerts,
                 "top_recalled": _top_recalled,
             }
         except Exception:

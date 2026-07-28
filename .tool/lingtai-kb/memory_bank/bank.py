@@ -352,7 +352,8 @@ class MemoryBank:
 
     def query(self, keyword: str = None, status: str = "active", min_confidence: float = 0.0,
                   branch: str = "", include_archived: bool = False,
-                  consumer: str = "", audit_limit: int = 20) -> List[dict]:
+                  consumer: str = "", audit_limit: int = 20,
+                  audit_source: str = "memory_search") -> List[dict]:
         """
         查询记忆（支持场景分支过滤 + 归档包含 + 关键词相关性排序 + 消费者过滤）
 
@@ -363,6 +364,8 @@ class MemoryBank:
             branch: 场景分支过滤。空=搜索全部
             include_archived: 是否包含已归档
             consumer: 预期消费者过滤。空=搜索全部
+            audit_limit: 审计记录命中条数上限
+            audit_source: 审计来源标记（memory_search / knowledge_bridge）
 
         Returns:
             List[dict]: 匹配的记忆列表（按相关性+置信度降序）
@@ -461,17 +464,17 @@ class MemoryBank:
                 r["relevance_score"] = round(r.get("current_confidence", 0), 4)
             results.sort(key=lambda x: x["current_confidence"], reverse=True)
 
-        # ── 召回效能审计：记录 query_hit / query_miss ──
+        # ── 召回效能审计：记录 query_hit / query_miss（带来源标记）──
         if keyword:
             if results:
                 for r in results[:audit_limit]:
                     try:
-                        self._audit("query_hit", r.get("id", ""), f"keyword={keyword}, relevance={r.get('relevance_score', 0)}")
+                        self._audit("query_hit", r.get("id", ""), f"source={audit_source}, keyword={keyword}, relevance={r.get('relevance_score', 0)}")
                     except Exception:
                         pass
             else:
                 try:
-                    self._audit("query_miss", "", f"keyword={keyword}")
+                    self._audit("query_miss", "", f"source={audit_source}, keyword={keyword}")
                 except Exception:
                     pass
         return results
