@@ -44,7 +44,7 @@ def check_existing_stage_today():
     return False
 
 def write_logs(summary, actions_taken, auto_adopted):
-    """写入 丹房/日志.md 和 oplog.jsonl"""
+    """写入 oplog.jsonl（丹房/日志.md 已退役，工作印记替代）"""
     now = datetime.now()
     ts = now.strftime("%Y-%m-%dT%H:%M:00+08:00")
     ts_short = now.strftime("%y-%m-%d %H:%M")
@@ -62,14 +62,6 @@ def write_logs(summary, actions_taken, auto_adopted):
     # Build log line
     summary_line = f"每日睡眠进化：收割{harvested}条→模式{patterns}个→候选{candidates}条→自动采纳{auto_adopted}条"
 
-    
-    # 日志.md（在末尾追加）
-    log_entry = f"[{ts_short}] WB auto | skillopt | {summary_line} | sleep@0300\n"
-    
-    log_path = os.path.join(VAULT, "丹房", "日志.md")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(log_entry)
-    
     # oplog.jsonl（末尾追加）
     oplog_path = os.path.join(VAULT, "丹房", ".meta", "oplog.jsonl")
     oplog_entry = {
@@ -94,7 +86,7 @@ def write_logs(summary, actions_taken, auto_adopted):
     with open(oplog_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(oplog_entry, ensure_ascii=False) + "\n")
     
-    return log_entry, oplog_entry
+    return oplog_entry
 
 def git_commit():
     """执行 Git 提交。"""
@@ -200,7 +192,7 @@ def main():
     
     # 第6步：日志登记
     print("\n📝 第6步：日志登记")
-    log_entry, oplog_entry = write_logs(summary, actions_taken, auto_adopted)
+    oplog_entry = write_logs(summary, actions_taken, auto_adopted)
     print(f"日志: {log_entry.strip()}")
     
     # 第7步：Git 提交
