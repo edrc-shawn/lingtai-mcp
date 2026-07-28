@@ -24,6 +24,7 @@ from .merge_policy import (
     make_entry, project_entries, apply_strategy,
     DEFAULT_MAX_ENTRIES,
 )
+from .crdt import CrdtState, crdt_merge_entries
 
 from content_registry import ContentRegistry, content_hash, mem_id_from_hash
 from logger import get_logger
@@ -63,9 +64,16 @@ class MemoryBank:
         self.registry = registry if registry is not None else ContentRegistry(vault_path)
         self._lock = threading.RLock()  # 写操作可重入互斥锁（write→_save 嵌套调用安全）
         self.memories: List[Memory] = self._load()
+        self.crdt_state = CrdtState(end_id="unknown", data_dir=str(self.data_dir))
         self._id_index: dict = {}  # {memory_id: Memory} O(1) 检索
         self._keyword_index: dict = {}  # {word: set(memory_ids)} 倒排索引
         self._rebuild_index()
+
+    def set_client(self, name: str):
+        """设置端标识，更新 CRDT 状态的 end_id，并从对端同步版本向量。"""
+        if name and name != "unknown":
+            self.crdt_state = CrdtState(end_id=name, data_dir=str(self.data_dir))
+            self.crdt_state.sync_from_peers()
 
     def _audit(self, action: str, memory_id: str, detail: str = ""):
         self.audit_log.record(action, memory_id, detail)
@@ -262,6 +270,10 @@ class MemoryBank:
         strategy = get_default_strategy(memory_type)
         new_entry = make_entry(content, confidence, source_type, why=why)
 
+        # === CRDT 注入：为 entry 添加版本向量 ===
+        crdt_dot = self.crdt_state.increment()
+        new_entry["crdt"] = {"dot": crdt_dot, "origin": self.crdt_state.end_id}
+
         # 找同 topic 的已有记忆（按记忆类型分阈值）
         existing_mem = None
         merge_threshold = 0.5 if memory_type.value == "episodic" else 0.3
@@ -280,24 +292,10 @@ class MemoryBank:
                 "timestamp": existing_mem.created_at,
                 "status": "active",
             }]
-            outcome = apply_strategy(strategy, existing_entries, new_entry, max_entries=DEFAULT_MAX_ENTRIES)
-
-            if outcome["action"] == "noop":
-                existing_mem.last_verified = datetime.now().isoformat()
-                if tags:
-                    existing_tags = set(existing_mem.tags or [])
-                    existing_tags.update(tags)
-                    existing_mem.tags = list(existing_tags)
-                self._save()
-                self._audit("write_merge_noop", existing_mem.id, outcome["reason"])
-                return {"success": True, "id": existing_mem.id, "confidence": existing_mem.current_confidence, "status": existing_mem.status, "merge_action": "noop", "message": f"合并策略跳过写入（{outcome['reason']}）"}
-
-            if outcome["action"] == "reject":
-                self._audit("write_merge_reject", existing_mem.id, outcome["reason"])
-                return {"success": False, "id": existing_mem.id, "merge_action": "reject", "reason": outcome["reason"], "message": f"合并策略拒绝写入（{outcome['reason']}）"}
-
-            existing_mem.entries = outcome["entries"]
-            proj = project_entries(outcome["entries"])
+            # 使用 CRDT 合并（自动处理多端并发写入）
+            merged_entries = crdt_merge_entries(existing_entries, new_entry, max_entries=DEFAULT_MAX_ENTRIES)
+            existing_mem.entries = merged_entries
+            proj = project_entries(merged_entries)
             existing_mem.content = proj["content"]
             existing_mem.current_confidence = proj["confidence"]
             existing_mem.memory_type = memory_type.value

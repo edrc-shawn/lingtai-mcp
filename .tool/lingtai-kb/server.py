@@ -131,6 +131,7 @@ class LingtaiMCPServer(KnowledgeMixin, PerceptionMixin, PageMixin, RefineMixin,
         """由 router 在 MCP initialize 时调用，写入当前调用端标识。"""
         if name:
             self.client = str(name)
+            self.memory_bank.set_client(name)
         if version:
             self.client_version = str(version)
 
