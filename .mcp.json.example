@@ -7,7 +7,8 @@
       "cwd": ".tool/lingtai-kb",
       "env": {
         "LINGTAI_VAULT": ".",
-        "PYTHONIOENCODING": "utf-8"
+        "PYTHONIOENCODING": "utf-8",
+        "LINGTAI_DISABLE_SEMANTIC": "0"
       }
     }
   }

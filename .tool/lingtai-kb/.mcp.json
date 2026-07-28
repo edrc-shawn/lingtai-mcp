@@ -8,7 +8,8 @@
       "env": {
         "LINGTAI_VAULT": "../..",
         "PYTHONIOENCODING": "utf-8",
-        "PYTHONUTF8": "1"
+        "PYTHONUTF8": "1",
+        "LINGTAI_DISABLE_SEMANTIC": "0"
       }
     }
   }
