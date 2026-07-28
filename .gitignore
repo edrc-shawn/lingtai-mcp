@@ -199,3 +199,12 @@ scripts/
 # ── 规划文档（非源代码，不公开） ────────────────────
 .tool/灵台MCP全景架构.html
 .tool/灵台MCP功能改造计划.md
+
+# ── 本地 MCP 配置（含路径，非通用） ─────────────────
+.tool/lingtai-kb/.mcp.json
+
+# ── 运行时日志（路径嵌套异常） ─────────────────────
+.tool/lingtai-kb/.tool/
+
+# ── Mimocode IDE 配置（本地定制） ───────────────────
+.mimoignore
