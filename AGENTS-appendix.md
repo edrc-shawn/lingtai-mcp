@@ -396,7 +396,7 @@ knowledge_search(keyword)
 
 ### 5.1 写丹房日志（丹房页操作 → 自动）
 
-往 `丹房/日志.md` 追加倒序记录 + `丹房/.meta/oplog.jsonl` 机读版。
+往 `丹房/.meta/oplog.jsonl` 追加机读记录（人类版日志.md 已退役，工作印记替代）。
 
 ### 5.2 重建灵识索引
 

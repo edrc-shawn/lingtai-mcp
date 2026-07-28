@@ -20,8 +20,7 @@ trigger: 定时任务调度（每日各时段触发），或用户手动调用
 
 | 来源 | 优先级 | 说明 |
 |:-----|:-------|:-----|
-| `丹房/日志.md` | mandatory | 获取当日操作记录 |
-| `丹房/.meta/oplog.jsonl` | mandatory | 机读操作日志 |
+| `丹房/.meta/oplog.jsonl` | mandatory | 机读操作日志（人类版日志已退役） |
 | `原料/` | mandatory | 待处理原料队列 |
 | `体检/` | optional | 前日体检结果 |
 
@@ -63,7 +62,7 @@ trigger: 定时任务调度（每日各时段触发），或用户手动调用
   2. kb_query → 找目标丹房页面
   3. LLM 分流判断 → 补角/补强/存原料
   4. 写入丹房页
-  5. 追加丹房/日志.md + oplog.jsonl
+  5. 追加 oplog.jsonl
   6. sys_refresh_index
   7. git commit
 ```

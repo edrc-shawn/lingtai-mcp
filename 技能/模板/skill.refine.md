@@ -50,7 +50,7 @@ trigger: '用户说"总结到灵台"/"结束"（分段归档）'
      ③ 日志条目
   3. 用户逐条确认：✓保留 / ✗丢弃 / ✎修改
   4. 确认后执行：
-     写入丹房页面 → 追加丹房/日志.md + oplog.jsonl
+     写入丹房页面 → 追加 oplog.jsonl
      → sys_refresh_index → git commit
 
 ```
