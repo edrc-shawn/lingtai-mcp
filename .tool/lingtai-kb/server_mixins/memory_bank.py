@@ -83,7 +83,7 @@ class MemoryBankMixin:
     def mem_query(self, keyword: str = None, min_confidence: float = 0.0, branch: str = "",
                    include_archived: bool = False, include_pending: bool = True,
                    min_relevance: float = 0.0, normalize_dates: bool = False,
-                   semantic: bool = True, consumer: str = "", top_k: int = 20) -> dict:
+                   semantic: bool = False, consumer: str = "", top_k: int = 20) -> dict:
         """检索记忆银行中的教训/偏好/纠正/决策记录。
         场景：找"之前发生过什么""用户纠正过什么""上次怎么决定的""我的偏好是什么"时。
         区别：找知识概念用 knowledge_search；找会话级交互日志用 episodic_search；获取完整会话上下文用 context_load。
@@ -94,10 +94,11 @@ class MemoryBankMixin:
                              若无任何结果达阈值，返回 low_confidence: true + 空 results。
         normalize_dates=True 时：对含 context.session_timestamp 的记忆做日期归一化，
                                 归一化结果存到 normalized_content 字段。
-        semantic=True 时（默认）：在子串检索后追加一轮语义检索（bge-small-zh-v1.5 本地模型），
+        semantic=True 时：在子串检索后追加一轮语义检索（bge-small-zh-v1.5 本地模型），
                          两路结果按权重合并（substring=0.3, semantic=0.7），
                          返回值中 semantic_results 字段列出语义命中的额外条目。
                          语义模型已在启动时后台预热（~30-40s），首调不需要额外等待。
+                         注意：Python 3.14 + torch 不兼容时需设置 LINGTAI_DISABLE_SEMANTIC=1。
         consumer 可选，按预期消费者过滤（如 "reasonix" / "workbuddy"），空=不过滤。
         """
         status = "" if include_pending else "active"

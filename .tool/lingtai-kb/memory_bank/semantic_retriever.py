@@ -23,7 +23,14 @@ from logger import get_logger
 
 log = get_logger(__name__)
 
+# ── 语义模型禁用开关 ──
+# Python 3.14 + torch 2.13.0 存在 ABI 不兼容，import torch 直接 Segfault。
+# 设置 LINGTAI_DISABLE_SEMANTIC=1 可跳过模型加载，memory_search 回退纯关键词。
+_SEMANTIC_DISABLED = os.environ.get("LINGTAI_DISABLE_SEMANTIC", "").strip().lower() in ("1", "true", "yes")
+
 _MODEL = None
+if _SEMANTIC_DISABLED:
+    _MODEL = -1  # sentinel: 已确认禁用，不再尝试加载
 _MODEL_LOCK = threading.Lock()
 _HERE = Path(__file__).parent
 _CACHE_DIR = _HERE / "data"
@@ -32,11 +39,12 @@ _EMBEDDING_DIM = 512
 _MODEL_CACHE_DIR = _HERE / "model_cache"
 
 # 模型缓存路径指向项目本地目录（方案 C）：隔离系统清理风险，始终离线运行
-os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-os.environ.setdefault("HF_HOME", str(_MODEL_CACHE_DIR))
-# 强制离线：模型已通过下载脚本缓存到 HF_HOME，运行时永不联网
-# 首次部署需先跑 .tool/scripts/download_semantic_model.py
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
+if not _SEMANTIC_DISABLED:
+    os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+    os.environ.setdefault("HF_HOME", str(_MODEL_CACHE_DIR))
+    # 强制离线：模型已通过下载脚本缓存到 HF_HOME，运行时永不联网
+    # 首次部署需先跑 .tool/scripts/download_semantic_model.py
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 # BGE 非对称检索指令前缀：短查询 → 长文档
 # 不加前缀时 bge 的 query/doc embedding 处于同一空间但区分度低，
@@ -47,6 +55,9 @@ BGE_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
 def preload_model():
     """预热加载语义模型，供 server 启动时后台线程调用。
     返回是否加载成功。静默失败不抛异常。"""
+    if _SEMANTIC_DISABLED:
+        log.info("semantic model disabled via LINGTAI_DISABLE_SEMANTIC")
+        return False
     model = _get_model()
     if model is not None:
         try:
@@ -60,7 +71,12 @@ def preload_model():
 def _get_model():
     global _MODEL
     if _MODEL is not None:
+        if _MODEL == -1:  # sentinel: disabled
+            return None
         return _MODEL
+    if _SEMANTIC_DISABLED:
+        _MODEL = -1
+        return None
     if not _MODEL_LOCK.acquire(blocking=False):
         return None  # 另一线程正在加载
     try:
@@ -68,9 +84,11 @@ def _get_model():
         _MODEL = SentenceTransformer("BAAI/bge-small-zh-v1.5")
     except Exception as e:
         log.warning("semantic_retriever Model load failed: %s", e)
-        _MODEL = None
+        _MODEL = -1  # mark as tried-and-failed, don't retry
     finally:
         _MODEL_LOCK.release()
+    if _MODEL == -1:
+        return None
     return _MODEL
 
 
