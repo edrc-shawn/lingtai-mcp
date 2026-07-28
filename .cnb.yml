@@ -3,6 +3,8 @@ main:
     - imports:
         - https://cnb.cool/edrc.shawn/lingtai-data/-/blob/main/gitee-secrets.yml
       stages:
+        - name: 敏感信息扫描
+          uses: cnb/gitleaks-action@v1
         - name: mirror to gitee
           script: |
             if [ -z "$GITEE_TOKEN" ]; then
