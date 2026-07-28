@@ -14,6 +14,7 @@
 也包含知识生命周期扫描工具（lifecycle_scan），用于检测可降级/可清理的页面。
 """
 
+import hashlib
 import json
 import os
 import numpy as np
@@ -30,6 +31,7 @@ _MAX_SIM = 0.75      # 最高相似度（高于此 = 重复）
 _TOP_N_DEFAULT = 20  # 默认返回条数
 _TITLE_OVERLAP_THRESHOLD = 0.5  # 标题 bigram 重叠超过此值视为重复
 _CACHE_FILENAME = "danfang_embeddings.json"
+_COLLISION_CACHE_FILENAME = "danfang_collisions.json"
 
 
 def _get_model():
@@ -83,6 +85,38 @@ def _save_cache(vault_path: str, cache: dict):
     cache_dir = Path(vault_path) / ".tool" / "lingtai-kb" / "data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / _CACHE_FILENAME
+    cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+
+
+def _compute_signature(pages: List[dict]) -> str:
+    """计算所有页面的内容签名，用于碰撞结果缓存。
+
+    基于每页的 path + content_hash 生成 SHA256 签名。
+    任一页新增/修改/删除 → 签名变化 → 自动触发重算。
+    """
+    items = sorted(
+        f"{p.get('path','')}:{p.get('content_hash') or p.get('body_hash') or ''}"
+        for p in pages
+    )
+    return hashlib.sha256("|".join(items).encode("utf-8")).hexdigest()
+
+
+def _load_collision_cache(vault_path: str) -> dict:
+    """加载碰撞结果缓存。"""
+    cache_path = Path(vault_path) / ".tool" / "lingtai-kb" / "data" / _COLLISION_CACHE_FILENAME
+    if cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _save_collision_cache(vault_path: str, cache: dict):
+    """持久化碰撞结果缓存。"""
+    cache_dir = Path(vault_path) / ".tool" / "lingtai-kb" / "data"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / _COLLISION_CACHE_FILENAME
     cache_path.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
 
@@ -195,6 +229,54 @@ def collide(
     """
     cache = build_index(vault_path, pages)
 
+    # ── 碰撞结果缓存检测（按页面签名）──
+    signature = _compute_signature(pages)
+    collision_cache = _load_collision_cache(vault_path)
+    cached = collision_cache.get(signature)
+    if cached is not None:
+        # 构建 path → page 映射（用于 title 查询）
+        path_to_page = {p.get("path", ""): p for p in pages}
+        all_pairs = cached.get("all_pairs", [])
+        all_dups = cached.get("all_duplicates", [])
+
+        # 按 domain_filter 过滤
+        if domain_filter:
+            all_pairs = [c for c in all_pairs if domain_filter in (c.get("domain_a", ""), c.get("domain_b", ""))]
+            all_dups = [c for c in all_dups if domain_filter in (c.get("domain_a", ""), c.get("domain_b", ""))]
+
+        # 按相似度范围过滤（缓存可能存的是 0.6-0.75，调用可能更窄）
+        all_pairs = [c for c in all_pairs if min_sim <= c.get("similarity", 0) <= max_sim]
+        all_dups = [c for c in all_dups if min_sim <= c.get("similarity", 0) <= max_sim]
+
+        # 取 top_n 并生成理由
+        true_collisions = all_pairs[:top_n]
+        duplicates = all_dups[:top_n]
+        for c in true_collisions:
+            if "reason" not in c:
+                c["reason"] = _generate_reason(c)
+
+        log.info("concept_collide cache HIT", extra={"signature": signature[:12], "pairs": len(all_pairs), "dups": len(all_dups)})
+        return {
+            "total_pages": len(pages),
+            "pages_embedded": cached.get("pages_embedded", 0),
+            "pairs_evaluated": cached.get("pairs_evaluated", 0),
+            "collisions": true_collisions,
+            "duplicates": duplicates,
+            "stats": {
+                "min_similarity": min_sim,
+                "max_similarity": max_sim,
+                "top_n": top_n,
+                "domain_filter": domain_filter or "全部",
+                "domain_skip_same": domain_skip_same,
+                "duplicates_filtered": len(duplicates),
+                "cached": True,
+            },
+            "_cache_info": {"signature": signature[:12], "hit": True},
+        }
+
+    # ── 缓存未命中：全量计算 ──
+    log.info("concept_collide cache MISS, computing...", extra={"pages": len(pages)})
+
     # 构建 path → page 映射 + 向量查表
     path_to_page = {p.get("path", ""): p for p in pages}
     vectors = {}  # path → np.ndarray
@@ -262,6 +344,15 @@ def collide(
         else:
             true_collisions.append(c)
 
+    # ── 保存全量碰撞结果到缓存（top_n 切片前）──
+    collision_cache[signature] = {
+        "all_pairs": true_collisions,
+        "all_duplicates": duplicates,
+        "pages_embedded": len(vectors),
+        "pairs_evaluated": all_pairs_evaluated,
+    }
+    _save_collision_cache(vault_path, collision_cache)
+
     true_collisions = true_collisions[:top_n]
     duplicates = duplicates[:top_n]
 
@@ -283,6 +374,7 @@ def collide(
             "domain_skip_same": domain_skip_same,
             "duplicates_filtered": len(duplicates),
         },
+        "_cache_info": {"signature": signature[:12], "hit": False},
     }
 
 
