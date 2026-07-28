@@ -184,3 +184,18 @@ scripts/
 
 # ── CI 配置（非公开仓所需） ─────────────────────────
 .github/
+
+# ── IDE 配置（本地定制，不进公开仓） ─────────────────
+.claudeignore
+
+# ── 运行时自动生成状态文件 ──────────────────────────
+.tool/lingtai-kb/.auto_evolve_state.json
+.tool/lingtai-kb/skillopt/adoption_guard.json
+.tool/lingtai-kb/skillopt/blacklist.json
+
+# ── 临时脚本（非通用） ──────────────────────────────
+.tool/lingtai-kb/tmp_check_rules.py
+
+# ── 规划文档（非源代码，不公开） ────────────────────
+.tool/灵台MCP全景架构.html
+.tool/灵台MCP功能改造计划.md
