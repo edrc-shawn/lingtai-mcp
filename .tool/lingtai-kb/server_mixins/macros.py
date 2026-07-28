@@ -349,6 +349,46 @@ class MacroMixin:
             except Exception as e:
                 steps.append({"step": "link", "status": "warn", "error": str(e), "summary": "建链跳过（非致命）"})
 
+        # ── 步骤 5: action_hint（行动索引建议——方向一落地）──
+        # 提炼完成后检测原料堆积，主动建议"干中学"方向
+        action_hint = None
+        if not has_error and created_path:
+            try:
+                status = self.refine_status(mode="all")
+                pending = status.get("pending", 0)
+                if pending >= 5:
+                    _DOMAIN_ACTION = {
+                        "00-思考与认知": "认知框架文章或深度思考",
+                        "01-内容创作": "选题池或作品产出",
+                        "02-成长与日常": "行动清单或反思日记",
+                        "03-社会观察": "评论文章或社会分析",
+                        "04-身体与健康": "健康计划或行动项",
+                        "05-哲学与思想": "哲学思辨或思想笔记",
+                        "06-商业与投资": "商业模式分析或投资决策",
+                        "07-工具与AI": "工具改进或方法论总结",
+                        "08-教育": "教育方法或课程设计",
+                        "99-一人公司": "业务决策或流程优化",
+                    }
+                    action_scene = _DOMAIN_ACTION.get(target_domain, "行动项")
+                    action_hint = {
+                        "pending_total": pending,
+                        "domain": target_domain,
+                        "suggestion": f"知识库还有 {pending} 篇待提炼原料。刚提炼的「{target_domain}」域知识可考虑转化成{action_scene}——干中学比囤着更有效。",
+                    }
+                    steps.append({
+                        "step": "action_hint",
+                        "status": "ok",
+                        "summary": action_hint["suggestion"],
+                    })
+                else:
+                    steps.append({
+                        "step": "action_hint",
+                        "status": "ok",
+                        "summary": f"待提炼原料 {pending} 篇，库存健康",
+                    })
+            except Exception as e:
+                steps.append({"step": "action_hint", "status": "warn", "error": str(e), "summary": "行动建议跳过（非致命）"})
+
         overall = "error" if has_error else "ok"
         result = {
             "macro": "refine_quick",
@@ -359,6 +399,7 @@ class MacroMixin:
             "domain": target_domain,
             "title": title,
             "raw_count": len(raw_paths),
+            "action_hint": action_hint,
         }
         try:
             client = getattr(self, 'client', '')
