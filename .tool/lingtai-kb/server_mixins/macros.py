@@ -668,6 +668,7 @@ class MacroMixin:
             steps.append({"step": "raw_save", "status": "skipped", "summary": "无画像候选"})
 
         # 步骤 4: memory_write（工作印记）
+        _step_timing = {"_start": time.time()}
         now = datetime.now()
         imprint_content = work_imprint
         if not imprint_content:
@@ -727,6 +728,7 @@ class MacroMixin:
                 except Exception:
                     log.debug("suppressed", exc_info=True)
             imprint_content = "\n".join(lines)
+        _step_timing["mem_write_start"] = time.time()
         try:
             mem_result = self.mem_write(
                 content=imprint_content,
@@ -737,6 +739,7 @@ class MacroMixin:
                 # 改为 behavior_pattern(0.005/天) 长衰减，留足毕业管道沉淀窗口。
                 expiry_policy="behavior_pattern",
             )
+            _step_timing["mem_write_ms"] = round((time.time() - _step_timing["mem_write_start"]) * 1000)
             steps.append({
                 "step": "memory_write",
                 "status": "ok",
@@ -749,6 +752,7 @@ class MacroMixin:
         # 步骤 5: L1 情景记忆（每次 session_end 自动写入）
         try:
             vault = getattr(self, 'vault_path', None) or r"."
+            _step_timing["episodic_start"] = time.time()
             l1 = EpisodicMemory(vault)
             # 从工作印记内容推导 summary 和 decisions
             imprint_lines = [l.strip() for l in imprint_content.split(':') if l.strip()]
@@ -767,6 +771,7 @@ class MacroMixin:
                 tags=["session_end"],
                 client=_client,
             )
+            _step_timing["episodic_ms"] = round((time.time() - _step_timing["episodic_start"]) * 1000)
             if l1_result.get("stored"):
                 steps.append({"step": "episodic_memory", "status": "ok", "summary": f"L1 情景记忆已写入: {l1_result['session_id']}"})
             else:
@@ -775,8 +780,11 @@ class MacroMixin:
             steps.append({"step": "episodic_memory", "status": "skipped", "summary": f"L1 暂不可用: {str(e)[:60]}"})
 
         # 步骤 6: concept_collide（跨域概念碰撞——收尾前主动发现意外关联）
+        _step_timing["concept_collide"] = round((time.time() - _step_timing["_start"]) * 1000)
+        _step_timing["_cc_start"] = time.time()
         try:
             cc_result = self.concept_collide(mode="page", top_n=5, min_similarity=0.65, max_similarity=0.75)
+            _step_timing["concept_collide_inner"] = round((time.time() - _step_timing["_cc_start"]) * 1000)
             collisions = cc_result.get("collisions", []) if isinstance(cc_result, dict) else []
             dup_count = len(cc_result.get("duplicates", [])) if isinstance(cc_result, dict) else 0
             if collisions:
@@ -830,11 +838,13 @@ class MacroMixin:
             log.debug("suppressed", exc_info=True)
 
         overall = "error" if has_error else "ok"
+        _step_timing["total"] = round((time.time() - _step_timing["_start"]) * 1000)
         result = {
             "macro": "session_end",
             "macro_id": macro_id,
             "overall": overall,
             "steps": steps,
+            "_timing_ms": _step_timing,
             "summary": f"收尾完成：{sum(1 for s in steps if s['status'] == 'ok')} ok / "
                        f"{sum(1 for s in steps if s['status'] == 'skipped')} skipped / "
                        f"{sum(1 for s in steps if s['status'] == 'error')} error",
