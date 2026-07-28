@@ -155,13 +155,15 @@ class SkillRouter:
 
     def detect_memory_signal(self, text: str) -> dict:
         """
-        检测用户消息中的【显式记忆信号】，返回记忆写入建议——信号闭环入口。
+        检测用户消息中的【显式+隐式记忆信号】，返回记忆写入建议——信号闭环入口。
 
         灵台不缺信源分级（见 confidence.py SOURCE_LEVELS），缺的是把用户自然语言
         解析成 detect_source_type 需要的 context/source_type。本方法填这个空：
           纠正类（"不对/应该是/别再"）      -> user_correction (0.9)
           指令类（"记住/以后/从今往后"）    -> user_directive  (0.8)
           偏好陈述（"我偏好/我喜欢/我习惯"） -> user_stated     (0.4)
+          隐式指令（"存到X/下次我直接X"）   -> mcp             (0.5)
+          隐式偏好（"方案X好/不做X"）       -> mcp             (0.5)
 
         Returns:
             dict: is_signal + signal_kind + source_type + confidence_hint +
@@ -174,6 +176,14 @@ class SkillRouter:
         correction = re.search(r"不对|不是这样|错了|搞错|应该是|纠正|别再|不要再|以后别|别老是", t)
         directive = re.search(r"记住|记一下|记录一下|存一下|存这个|别忘了|以后记得|从今往后|下次记得|请记得|牢记", t)
         preference = re.search(r"我偏好|我喜欢|我不喜欢|我习惯|我倾向|我一般|我通常|我讨厌", t)
+        # 隐式指令：陈述句式但含明确流程/位置/工具变更
+        implicit_directive = re.search(
+            r"存到|放到|放至|改为|换成|用.+替代|以后都|下次我|下次直接|都存到|都放"
+            r"|新建会话|在.+开|不再存|不存", t)
+        # 隐式偏好：决策选择或否定式偏好
+        implicit_preference = re.search(
+            r"方案.{0,15}[好行可以值得]|选.{0,6}[好行]|.+比.+好|不做|不要.+模式"
+            r"|别.+盯|不需要.+监工|优先|能不.+尽量", t)
 
         if correction:
             kind, source_type, conf, ctx = "correction", "user_correction", 0.9, {"user_corrected": True}
@@ -181,6 +191,10 @@ class SkillRouter:
             kind, source_type, conf, ctx = "directive", "user_directive", 0.8, {"source": "user_directive"}
         elif preference:
             kind, source_type, conf, ctx = "preference", "user_stated", 0.4, {"source": "user_directive"}
+        elif implicit_directive:
+            kind, source_type, conf, ctx = "implicit_directive", "mcp", 0.5, {"source": "ai_inferred"}
+        elif implicit_preference:
+            kind, source_type, conf, ctx = "implicit_preference", "mcp", 0.5, {"source": "ai_inferred"}
         else:
             return {"is_signal": False, "text": t}
 
@@ -195,16 +209,18 @@ class SkillRouter:
         suggested_status = "active" if conf >= 0.6 else "pending"
 
         tags = ["user_signal", "signal:" + kind]
-        if kind in ("correction", "preference"):
+        if kind in ("correction", "preference", "implicit_preference"):
             tags.append("type:knowledge")   # 用户教的 -> knowledge 分流（对齐 AGENTS.md 收尾规则）
-        if kind == "preference":
+        if kind in ("preference", "implicit_preference"):
             tags.append("preference")
         elif "回复" in t or "简洁" in t or "别啰嗦" in t:
             tags.append("reply_style")
 
-        label = {"correction": "纠正", "directive": "指令", "preference": "偏好"}[kind]
+        label = {"correction": "纠正", "directive": "指令", "preference": "偏好",
+                 "implicit_directive": "隐式指令", "implicit_preference": "隐式偏好"}[kind]
         tail = "高置信直接生效" if suggested_status == "active" else "保持 pending 待用户确认"
-        note = ("显式" + label + "信号 -> 建议 memory_write(content=..., source_type='"
+        prefix = "显式" if kind in ("correction", "directive", "preference") else ""
+        note = (prefix + label + "信号 -> 建议 memory_write(content=..., source_type='"
                 + source_type + "', tags=" + str(tags) + ")，" + tail)
 
         return {

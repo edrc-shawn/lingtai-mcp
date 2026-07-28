@@ -267,24 +267,6 @@ class RefineMixin:
         with open(raw_abs, 'w', encoding='utf-8') as f:
             f.write(raw_content)
 
-        # 2. 追加日志
-        log_path = os.path.join(vault, '丹房', '日志.md')
-        target_display = target.replace('丹房/', '', 1) if target.startswith('丹房/') else target
-        log_line = f'\n{log_prefix} WB dialog | 提炼 | {os.path.basename(raw_path)}→{target_display}（{grade}：{summary[:40]}） | → {target_display}\n'
-
-        with open(log_path, 'r', encoding='utf-8') as f:
-            log_content = f.read()
-
-        log_lines = log_content.split('\n')
-        insert_at = 4
-        for i, line in enumerate(log_lines):
-            if line.startswith('['):
-                insert_at = i
-                break
-        log_lines.insert(insert_at, log_line.rstrip())
-        with open(log_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(log_lines))
-
         # 同步写 refine-map.json
         rmap = self._read_refine_map()
         from datetime import datetime
@@ -302,5 +284,5 @@ class RefineMixin:
             "target": target,
             "summary": summary,
             "grade": grade,
-            "message": f"原料已标记为已提炼，日志已追加（依赖 page_create/page_update 的 commit 做统一提交）",
+            "message": f"原料已标记为已提炼（依赖 page_create/page_update 的 commit 做统一提交）",
         }

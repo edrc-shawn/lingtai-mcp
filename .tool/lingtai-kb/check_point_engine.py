@@ -212,20 +212,15 @@ class CheckPointEngine:
         """
         巡更完整性检查
         
-        验证今日各巡更任务是否完成（通过检查 hook-summaries 文件和日志）
-        为简单实现，只检查日志中今日有无各巡更类型的记录
-        """
+        验证今日各巡更任务是否完成（工作印记已取代人类版日志，跳过于此）"""
         today = datetime.now().strftime("%Y-%m-%d")
         
-        # 检查日志文件中今日的记录
-        log_path = self.丹房 / "日志.md"
-        if not log_path.exists():
-            return CheckResult(
-                name="patrol_completeness",
-                passed=False,
-                detail="日志文件不存在",
-                metric={}
-            )
+        return CheckResult(
+            name="patrol_completeness",
+            passed=True,
+            detail="人类版日志已退役，改用工作印记",
+            metric={}
+        )
         
         with open(log_path, "r", encoding="utf-8") as f:
             content = f.read()

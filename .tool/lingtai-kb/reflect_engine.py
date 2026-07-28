@@ -251,7 +251,7 @@ class ReflectEngine:
     
     # 图谱检查白名单：这些目录/文件的页面不需要图谱可见
     GRAPH_EXCLUDE_DIRS = {".meta"}
-    GRAPH_EXCLUDE_FILES = {"日志.md"}
+    GRAPH_EXCLUDE_FILES = set()
     
     def _is_graph_page(self, path: Path) -> bool:
         """判断文件是否为需要图谱可见的内容页"""
