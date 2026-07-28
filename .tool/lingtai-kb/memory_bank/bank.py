@@ -352,7 +352,7 @@ class MemoryBank:
 
     def query(self, keyword: str = None, status: str = "active", min_confidence: float = 0.0,
                   branch: str = "", include_archived: bool = False,
-                  consumer: str = "") -> List[dict]:
+                  consumer: str = "", audit_limit: int = 20) -> List[dict]:
         """
         查询记忆（支持场景分支过滤 + 归档包含 + 关键词相关性排序 + 消费者过滤）
 
@@ -460,6 +460,20 @@ class MemoryBank:
             for r in results:
                 r["relevance_score"] = round(r.get("current_confidence", 0), 4)
             results.sort(key=lambda x: x["current_confidence"], reverse=True)
+
+        # ── 召回效能审计：记录 query_hit / query_miss ──
+        if keyword:
+            if results:
+                for r in results[:audit_limit]:
+                    try:
+                        self._audit("query_hit", r.get("id", ""), f"keyword={keyword}, relevance={r.get('relevance_score', 0)}")
+                    except Exception:
+                        pass
+            else:
+                try:
+                    self._audit("query_miss", "", f"keyword={keyword}")
+                except Exception:
+                    pass
         return results
 
     @staticmethod

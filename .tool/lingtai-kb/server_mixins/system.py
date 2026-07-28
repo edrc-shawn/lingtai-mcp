@@ -485,6 +485,31 @@ class SystemMixin:
         except Exception:
             data["memory_conflicts"] = {"count": 0, "conflicts": []}
 
+        # 召回效能审计（P0：接通 audit.py 已设计的 query_hit/query_miss）
+        try:
+            _audit = self.memory_bank.audit_log
+            _stats = _audit.get_stats(days=7)
+            _by_action = _stats.get("by_action", {})
+            _hit_count = _by_action.get("query_hit", 0)
+            _miss_count = _by_action.get("query_miss", 0)
+            _total_queries = _hit_count + _miss_count
+            _empty_rate = round(_miss_count / max(_total_queries, 1) * 100, 1) if _total_queries > 0 else 0.0
+            # 被引用最多的记忆（召回最多的 Top 3）
+            _ref_entries = _audit.get_entries(action="query_hit", days=7)
+            from collections import Counter as _Counter
+            _hit_ids = _Counter(e.get("memory_id", "") for e in _ref_entries if e.get("memory_id"))
+            _top_recalled = [{"id": mid, "hit_count": cnt} for mid, cnt in _hit_ids.most_common(3)]
+            data["recall_efficacy"] = {
+                "total_queries_7d": _total_queries,
+                "hit_count": _hit_count,
+                "miss_count": _miss_count,
+                "empty_recall_rate": _empty_rate,
+                "alert": _empty_rate > 50 and _total_queries >= 3,
+                "top_recalled": _top_recalled,
+            }
+        except Exception:
+            data["recall_efficacy"] = {"error": "审计不可用"}
+
         # Q3: 质量板块——读取基准历史计算趋势
         import json as _json, os as _os
         _quality = {}
@@ -1201,14 +1226,21 @@ class SystemMixin:
             self._context_loaded = False
             self._context_cache = None
             self._context_index_mtime = 0.0
-            # 强制记忆银行从磁盘重载（绕过旧实例缓存的 _load 结果）
+            # 强制记忆银行重建实例（加载最新代码 + 数据）
             if hasattr(self, 'memory_bank'):
                 try:
-                    fresh = self.memory_bank._load()
-                    self.memory_bank.memories = fresh
-                    self.memory_bank._rebuild_index()
+                    from memory_bank.bank import MemoryBank as _MB
+                    _vault = self.memory_bank.data_dir.parent if hasattr(self.memory_bank, 'data_dir') else self.vault_path
+                    # 保留 vault_path 和 registry，重建实例
+                    _old_vault = getattr(self.memory_bank, 'vault_path', self.vault_path)
+                    _old_reg = getattr(self.memory_bank, 'registry', None)
+                    self.memory_bank = _MB(_old_vault, registry=_old_reg)
+                    # 恢复 client 标识
+                    _client = getattr(self, 'client', '') or getattr(self, 'client_version', '')
+                    if _client and _client != 'unknown':
+                        self.memory_bank.set_client(_client)
                     results["memory_bank_reloaded"] = True
-                    results["memory_bank_count"] = len(fresh)
+                    results["memory_bank_count"] = len(self.memory_bank.memories)
                 except Exception as e:
                     results["memory_bank_reload_error"] = str(e)
             # 重置 skillopt 引擎（直接重建，绕过 _ensure_skillopt 的 _ 方法不复制问题）
