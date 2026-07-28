@@ -295,6 +295,8 @@ class MemoryBank:
             # 使用 CRDT 合并（自动处理多端并发写入）
             merged_entries = crdt_merge_entries(existing_entries, new_entry, max_entries=DEFAULT_MAX_ENTRIES)
             existing_mem.entries = merged_entries
+            # 构造 outcome 供审计日志和返回值使用（apply_strategy 未调用，CRDT 路径手动包装）
+            outcome = {"action": "write", "entries": merged_entries, "reason": "crdt_merged"}
             proj = project_entries(merged_entries)
             existing_mem.content = proj["content"]
             existing_mem.current_confidence = proj["confidence"]
