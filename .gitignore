@@ -208,3 +208,6 @@ scripts/
 
 # ── Mimocode IDE 配置（本地定制） ───────────────────
 .mimoignore
+
+# 本地影子快照仓库（私人数据历史，纯本地不推远程）
+.shadow-git/
