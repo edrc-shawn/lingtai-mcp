@@ -712,73 +712,61 @@ class SystemMixin:
             today = datetime.now().strftime("%m-%d")
 
             text = ledger_path.read_text(encoding="utf-8")
-            # 在 🔴 待处理区找到匹配缺口行，移到 ✅ 已消解区
             lines = text.split("\n")
-            
-            moved = False
-            new_lines = []
-            in_pending = False
-            in_resolved = False
-            pending_end = 0
-            resolved_end = 0
-            
+
+            # 定位分区行（🔴 待处理 / ✅ 已消解）
+            pending_idx = None
+            resolved_idx = None
             for i, line in enumerate(lines):
                 if "🔴 待处理" in line:
-                    in_pending = True
-                    in_resolved = False
+                    pending_idx = i
                 elif "✅ 已消解" in line:
-                    in_resolved = True
+                    resolved_idx = i
+            if pending_idx is None or resolved_idx is None:
+                return {"error": "对账.md 结构异常：缺少待处理/已消解分区标记"}
+
+            # 1) 从待处理区移除匹配行（移出，不保留），并记录其来源列
+            matched = False
+            matched_source = "—"
+            new_lines = []
+            in_pending = False
+            for i, line in enumerate(lines):
+                if i == pending_idx:
+                    in_pending = True
+                elif i == resolved_idx:
                     in_pending = False
-                elif line.strip().startswith("---") and in_pending and not pending_end:
-                    pending_end = i
-                
-                # 在待处理区找匹配行
-                if in_pending and not moved and "|" in line and "--" not in line:
+                if in_pending and "|" in line and "--" not in line:
                     parts = [p.strip() for p in line.split("|")]
                     if len(parts) >= 2 and parts[1] == gap:
-                        # 改成已修，移到后面
-                        new_line = f"| {gap} | {parts[2]} | {status} {today} |"
-                        new_lines.append(new_line)
-                        moved = True
-                        continue  # 跳过原行
-                
+                        matched = True
+                        if len(parts) >= 3 and parts[2]:
+                            matched_source = parts[2]
+                        continue  # 移出待处理区
                 new_lines.append(line)
-            
-            if moved:
-                # 把已修行追加到 ✅ 已消解 后面
-                result_lines = []
-                inserted = False
-                for line in new_lines:
-                    result_lines.append(line)
-                    if "✅ 已消解" in line and not inserted:
-                        # 找到已消解区末尾，追加新行
-                        inserted = True
-                
-                # 在已消解表格的末尾插入
-                result_text = "\n".join(result_lines)
-                # 在第一个 --- 分隔符前插入
-                parts = result_text.split("---", 1)
-                resolved_section = parts[0]
-                rest = parts[1] if len(parts) > 1 else ""
-                
-                # 在已消解表格中追加一行
-                # 找已消解表格的当前最后一行
-                resolved_lines = resolved_section.split("\n")
-                # 在最后一行前插入
-                # 找到表格最后一行的索引
-                last_table_row = len(resolved_lines) - 1
-                for i in range(len(resolved_lines) - 1, -1, -1):
-                    if "|" in resolved_lines[i] and "--" not in resolved_lines[i] and "缺口" not in resolved_lines[i]:
-                        last_table_row = i
-                        break
-                resolved_lines.insert(last_table_row + 1, f"| {gap} | — | {status} {today} |")
-                resolved_section = "\n".join(resolved_lines)
-                result_text = resolved_section + ("---" + rest if rest else "")
 
-                ledger_path.write_text(result_text, encoding="utf-8")
-                return {"action": "close", "gap": gap, "status": status, "result": "缺口已关闭"}
-            else:
+            if not matched:
                 return {"action": "close", "gap": gap, "error": "未找到匹配缺口"}
+
+            # 2) 在已消解区表格末尾（下一个 --- 或 ## 之前）追加一行
+            section_end = len(new_lines)
+            for i in range(resolved_idx + 1, len(new_lines)):
+                if new_lines[i].strip().startswith("---") or new_lines[i].startswith("## "):
+                    section_end = i
+                    break
+            last_row_idx = None
+            for i in range(section_end - 1, resolved_idx, -1):
+                line = new_lines[i]
+                if "|" in line and "--" not in line and "缺口" not in line and "来源" not in line:
+                    last_row_idx = i
+                    break
+            if last_row_idx is None:
+                last_row_idx = resolved_idx
+            new_lines.insert(last_row_idx + 1,
+                             f"| {gap} | {matched_source} | {status} {today} |")
+
+            ledger_path.write_text("\n".join(new_lines), encoding="utf-8")
+            return {"action": "close", "gap": gap, "status": status,
+                    "result": "缺口已关闭（已移入已消解区）"}
 
         return {"error": f"未知操作: {action}"}
 
